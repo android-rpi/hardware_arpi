@@ -29,8 +29,7 @@ LOCAL_SHARED_LIBRARIES := \
         libEGL \
         libui \
         libsync \
-        libdrm \
-        libgralloc_drm
+        libdrm
 
 LOCAL_HEADER_LIBRARIES := \
         android.hardware.graphics.mapper@2.0-passthrough_headers \

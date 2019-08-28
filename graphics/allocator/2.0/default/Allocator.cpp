@@ -150,7 +150,6 @@ Return<void> Allocator::allocate(const BufferDescriptor& descriptor,
     hidl_vec<hidl_handle> hidlBuffers(buffers.cbegin(), buffers.cend());
     hidl_cb(Error::NONE, stride, hidlBuffers);
 
-    usleep(1000);
     freeBuffers(buffers);
     return Void();
 }
