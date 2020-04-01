@@ -1,16 +1,16 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := android.hardware.graphics.allocator@2.0-service.rpi3
+LOCAL_MODULE := android.hardware.graphics.allocator@2.0-service.rpi4
 LOCAL_VENDOR_MODULE := true
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_INIT_RC := android.hardware.graphics.allocator@2.0-service.rpi3.rc
+LOCAL_INIT_RC := android.hardware.graphics.allocator@2.0-service.rpi4.rc
 
 LOCAL_SRC_FILES := \
-        drm_gralloc_rpi3.cpp \
+        drm_gralloc_v3d.cpp \
         Allocator.cpp \
         service.cpp
 

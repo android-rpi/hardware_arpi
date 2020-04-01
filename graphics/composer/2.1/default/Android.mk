@@ -1,14 +1,14 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := android.hardware.graphics.composer@2.1-impl.rpi3
+LOCAL_MODULE := android.hardware.graphics.composer@2.1-impl.rpi4
 LOCAL_VENDOR_MODULE := true
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := \
-        drm_kms_rpi3.cpp \
+        drm_kms_v3d.cpp \
         Hwc2Device.cpp \
         ComposerHal.cpp \
         ComposerCommandEngine.cpp \
@@ -30,7 +30,8 @@ LOCAL_SHARED_LIBRARIES := \
         libEGL \
         libui \
         libsync \
-        libdrm
+        libdrm \
+        libgralloc_drm
 
 LOCAL_HEADER_LIBRARIES := \
         android.hardware.graphics.mapper@2.0-passthrough_headers \

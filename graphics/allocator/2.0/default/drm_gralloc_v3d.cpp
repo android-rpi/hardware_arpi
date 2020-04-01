@@ -1,9 +1,9 @@
-#define LOG_TAG "allocator@2.0-drm_gralloc_rpi3"
-//#define LOG_NDEBUG 0
+#define LOG_TAG "allocator@2.0-drm_gralloc_v3d"
+#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <sys/errno.h>
 #include <drm_fourcc.h>
-#include "drm_gralloc_rpi3.h"
+#include "drm_gralloc_v3d.h"
 
 int drm_init(struct drm_module_t *mod) {
 	int err = 0;

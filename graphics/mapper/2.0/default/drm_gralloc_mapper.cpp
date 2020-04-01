@@ -1,9 +1,9 @@
-#define LOG_TAG "mapper@2.0-drm_mapper_rpi3"
+#define LOG_TAG "mapper@2.0-drm_gralloc_mapper"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <sys/errno.h>
 
-#include "drm_mapper_rpi3.h"
+#include "drm_gralloc_mapper.h"
 
 int drm_init(struct drm_module_t *mod) {
 	int err = 0;

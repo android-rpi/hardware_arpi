@@ -1,12 +1,12 @@
 #define LOG_TAG "mapper@2.0-Mapper"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
 #include <inttypes.h>
 #include <mapper-passthrough/2.0/GrallocBufferDescriptor.h>
 #include <hardware/gralloc1.h>
 
-#include "drm_mapper_rpi3.h"
+#include "drm_gralloc_mapper.h"
 #include "Mapper.h"
 
 namespace android {

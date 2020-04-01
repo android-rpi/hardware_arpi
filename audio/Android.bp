@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "audio.primary.rpi3",
+    name: "audio.primary.rpi4",
     relative_install_path: "hw",
     proprietary: true,
     srcs: ["audio_hw.c"],

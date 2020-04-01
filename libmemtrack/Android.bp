@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "memtrack.rpi3",
+    name: "memtrack.rpi4",
     relative_install_path: "hw",
     proprietary: true,
     srcs: ["memtrack_rpi.c"],

@@ -1,5 +1,5 @@
-#ifndef _GRALLOC_RPI_H_
-#define _GRALLOC_RPI_H_
+#ifndef _DRM_GRALLOC_MAPPER_H_
+#define _DRM_GRALLOC_MAPPER_H_
 
 #include <gralloc_drm.h>
 #include <gralloc_drm_priv.h>
@@ -10,4 +10,4 @@ int drm_unregister(buffer_handle_t handle);
 int drm_lock(buffer_handle_t handle, int usage, int x, int y, int w, int h, void **ptr);
 int drm_unlock(buffer_handle_t handle);
 
-#endif /* _GRALLOC_RPI_H_ */
+#endif /* _DRM_GRALLOC_MAPPER_H_ */

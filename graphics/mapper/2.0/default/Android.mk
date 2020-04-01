@@ -1,14 +1,14 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := android.hardware.graphics.mapper@2.0-impl.rpi3
+LOCAL_MODULE := android.hardware.graphics.mapper@2.0-impl.rpi4
 LOCAL_VENDOR_MODULE := true
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := \
-        drm_mapper_rpi3.cpp \
+        drm_gralloc_mapper.cpp \
         Mapper.cpp
 
 LOCAL_SHARED_LIBRARIES := \

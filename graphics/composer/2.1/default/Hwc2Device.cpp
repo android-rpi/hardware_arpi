@@ -1,5 +1,5 @@
 #define LOG_TAG "composer@2.1-Hwc2Device"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
@@ -18,7 +18,7 @@ Hwc2Device::Hwc2Device()
     ALOGV("Hwc2Device()");
     mHwcContext = std::make_unique<hwc_context>();
 
-    mFbInfo.name = "hwc-rpi3";
+    mFbInfo.name = "hwc-v3d";
     mFbInfo.width = mHwcContext->width;
     mFbInfo.height = mHwcContext->height;
     mFbInfo.format = mHwcContext->format;
@@ -221,7 +221,7 @@ void Hwc2Device::dump(uint32_t* outSize, char* outBuffer)
     }
 
     std::stringstream output;
-    output << "-- hwc-rpi3 --\n";
+    output << "-- hwc-v3d --\n";
     mDumpString = output.str();
     *outSize = static_cast<uint32_t>(mDumpString.size());
 }
