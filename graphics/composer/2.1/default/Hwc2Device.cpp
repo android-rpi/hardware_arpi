@@ -1,5 +1,5 @@
 #define LOG_TAG "composer@2.1-Hwc2Device"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>

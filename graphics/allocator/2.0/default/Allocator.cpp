@@ -1,5 +1,5 @@
 #define LOG_TAG "allocator@2.0-Allocator"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
 #include <grallocusage/GrallocUsageConversion.h>

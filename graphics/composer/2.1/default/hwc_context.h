@@ -2,7 +2,6 @@
 #define _HWC_CONTEXT_H_
 
 #include <xf86drmMode.h>
-#include <gralloc_drm.h>
 #include <gralloc_drm_priv.h>
 
 namespace android {
@@ -32,9 +31,6 @@ class hwc_context {
     float     ydpi;
 
   private:
-    struct drm_module_t *mModule;
-
-    int hwc_init(struct drm_module_t *mod);
     int init_kms();
     drmModeConnectorPtr fetch_connector(uint32_t type);
     int init_with_connector(struct kms_output *output,
@@ -58,7 +54,6 @@ class hwc_context {
     int page_flip(struct gralloc_drm_bo_t *bo);
     int waiting_flip;
     struct gralloc_drm_bo_t *current_front, *next_front;
-
 };
 
 } // namespace anroid

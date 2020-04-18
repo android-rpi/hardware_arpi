@@ -1,5 +1,5 @@
 #define LOG_TAG "mapper@2.0-Mapper"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
 #include <inttypes.h>

@@ -22,7 +22,7 @@
  */
 
 #define LOG_TAG "composer@2.1-drm_kms_v3d"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <errno.h>
@@ -73,9 +73,18 @@ int hwc_context::bo_add_fb(struct gralloc_drm_bo_t *bo)
 	uint32_t pitches[4] = { 0, 0, 0, 0 };
 	uint32_t offsets[4] = { 0, 0, 0, 0 };
 	uint32_t handles[4] = { 0, 0, 0, 0 };
+	uint64_t modifiers[4] = { 0, 0, 0, 0 };
+
+	uint32_t handle;
+	int ret = drmPrimeFDToHandle(kms_fd, bo->handle->prime_fd, &handle);
+	if (ret != 0) {
+		ALOGE("bo_add_fb() error drmPrimeFDToHandle()");
+		return ret;
+	}
 
 	pitches[0] = bo->handle->stride;
-	handles[0] = bo->fb_handle;
+	handles[0] = handle;
+	modifiers[0] = DRM_FORMAT_MOD_LINEAR;
 
 	int drm_format = drm_format_from_hal(bo->handle->format);
 
@@ -86,11 +95,11 @@ int hwc_context::bo_add_fb(struct gralloc_drm_bo_t *bo)
 
 	ALOGV("bo_add_fb() width:%d height:%d format:%x handle:%d pitch:%d",
 			bo->handle->width, bo->handle->height,
-					drm_format, bo->fb_handle, pitches[0]);
-	return drmModeAddFB2(bo->drm->fd,
+					drm_format, handle, pitches[0]);
+	return drmModeAddFB2WithModifiers(kms_fd,
 		bo->handle->width, bo->handle->height,
-		drm_format, handles, pitches, offsets,
-		(uint32_t *) &bo->fb_id, 0);
+		drm_format, handles, pitches, offsets, modifiers,
+		(uint32_t *) &bo->fb_id, DRM_MODE_FB_MODIFIERS);
 }
 
 /*
@@ -638,50 +647,37 @@ int hwc_context::init_kms()
 	return 0;
 }
 
-int hwc_context::hwc_init(struct drm_module_t *mod) {
-    int err = 0;
-    pthread_mutex_lock(&mod->mutex);
-    if (!mod->drm) {
-    	mod->drm = gralloc_drm_create();
-        if (!mod->drm)
-            err = -EINVAL;
-    }
-    if (!err) {
-        kms_fd = mod->drm->kms_fd;
-        err = init_kms();
-    }
-    pthread_mutex_unlock(&mod->mutex);
-	return err;
-}
-
+static char const *card0 = "/dev/dri/card0";
 
 hwc_context::hwc_context() {
     fps = 60.0;
-    int error = hw_get_module(GRALLOC_HARDWARE_MODULE_ID,
-           (const hw_module_t **)&mModule);
-    if (error) {
-        ALOGE("Failed to get mModule %d", error);
+    kms_fd = open(card0, O_RDWR);
+   	if (kms_fd > 0) {
+   		int error = init_kms();
+   	    if (error != 0) {
+   	        ALOGE("failed hwc_init_kms() %d", error);
+   	    } else {
+   	        width = (uint32_t)primary_output.mode.hdisplay;
+   	        height = (uint32_t)primary_output.mode.vdisplay;
+   	        fps = (float)primary_output.mode.vrefresh;
+   	        format = primary_output.fb_format;
+   	        xdpi = (float)primary_output.xdpi;
+   	        ydpi = (float)primary_output.ydpi;
+   	    }
     } else {
-        error = hwc_init(mModule);
-        if (error != 0) {
-            ALOGE("failed hwc_init_kms() %d", error);
-        } else {
-            width = (uint32_t)primary_output.mode.hdisplay;
-            height = (uint32_t)primary_output.mode.vdisplay;
-            fps = (float)primary_output.mode.vrefresh;
-            format = primary_output.fb_format;
-            xdpi = (float)primary_output.xdpi;
-            ydpi = (float)primary_output.ydpi;
-        }
+        ALOGE("hwc_context() failed to open %s", card0);
     }
 }
 
-
 int hwc_context::hwc_post(buffer_handle_t handle)
 {
-	struct gralloc_drm_bo_t *bo;
+	struct gralloc_drm_handle_t *drm_handle = gralloc_drm_handle(handle);
 
-	bo = gralloc_drm_bo_from_handle(handle);
+	if (!drm_handle)
+		return -EINVAL;
+
+	struct gralloc_drm_bo_t *bo = drm_handle->data;
+
 	if (!bo)
 		return -EINVAL;
 

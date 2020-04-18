@@ -1,5 +1,5 @@
 #define LOG_TAG "allocator@2.0-drm_gralloc_v3d"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <sys/errno.h>
 #include <drm_fourcc.h>
