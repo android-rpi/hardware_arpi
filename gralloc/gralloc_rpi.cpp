@@ -52,7 +52,7 @@ struct drm_module_t HAL_MODULE_INFO_SYM = {
 			.version_minor = 0,
 			.id = GRALLOC_HARDWARE_MODULE_ID,
 			.name = "arpi gralloc",
-			.author = "Peter Yoon",
+			.author = "Android-RPi",
 		},
 		.perform = drm_mod_perform,
 	},

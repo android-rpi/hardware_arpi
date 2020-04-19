@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2010-2011 Chia-I Wu <olvaffe@gmail.com>
  * Copyright (C) 2010-2011 LunarG Inc.
+ * Copyright (C) 2020 Android-RPi Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
