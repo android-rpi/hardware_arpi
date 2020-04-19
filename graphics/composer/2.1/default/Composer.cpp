@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "composer@2.0-Composer"
+#define LOG_TAG "composer@2.1-Composer"
 //#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
@@ -91,10 +91,6 @@ IComposerClient* Composer::createClient() {
     client->setOnClientDestroyed(clientDestroyed);
 
     return client;
-}
-
-IComposer* HIDL_FETCH_IComposer(const char* /* name */) {
-    return new Composer();
 }
 
 }  // namespace implementation

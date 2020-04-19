@@ -1,11 +1,13 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := android.hardware.graphics.composer@2.1-impl.rpi4
+LOCAL_MODULE := android.hardware.graphics.composer@2.1-service.rpi4
 LOCAL_VENDOR_MODULE := true
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_MODULE_TAGS := optional
+
+LOCAL_INIT_RC := android.hardware.graphics.composer@2.1-service.rpi4.rc
 
 LOCAL_SRC_FILES := \
         drm_kms_v3d.cpp \
@@ -13,15 +15,18 @@ LOCAL_SRC_FILES := \
         ComposerHal.cpp \
         ComposerCommandEngine.cpp \
         ComposerClient.cpp \
-        Composer.cpp
+        Composer.cpp \
+        service.cpp
 
 LOCAL_SHARED_LIBRARIES := \
         android.hardware.graphics.composer@2.1 \
         android.hardware.graphics.mapper@2.0 \
         android.hardware.graphics.mapper@3.0 \
         android.hardware.graphics.common@1.0 \
+        libbinder \
         libhidlbase \
         libhidltransport \
+        libbase \
         libutils \
         libcutils \
         liblog \
@@ -49,4 +54,4 @@ LOCAL_CFLAGS += \
         -Wall \
         -Werror
 
-include $(BUILD_SHARED_LIBRARY)
+include $(BUILD_EXECUTABLE)

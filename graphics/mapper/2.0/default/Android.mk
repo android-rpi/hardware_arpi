@@ -9,6 +9,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := \
         drm_gralloc_mapper.cpp \
+        Fence.cpp \
         Mapper.cpp
 
 LOCAL_SHARED_LIBRARIES := \
@@ -20,7 +21,7 @@ LOCAL_SHARED_LIBRARIES := \
         libcutils \
         liblog \
         libhardware \
-        libui \
+        libsync \
         libdrm \
         libgralloc_drm
 

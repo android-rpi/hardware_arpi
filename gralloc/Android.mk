@@ -10,12 +10,16 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := gralloc_rpi.cpp
 
 LOCAL_C_INCLUDES := \
-	external/drm_gralloc \
-	external/libdrm \
-	external/libdrm/include/drm
+    hardware/libhardware/include \
+    system/core/libsystem/include \
+    system/core/libcutils/include \
+    system/core/liblog/include \
+    external/drm_gralloc \
+    external/libdrm \
+    external/libdrm/include/drm
 
 LOCAL_SHARED_LIBRARIES := \
-	libgralloc_drm
+    libgralloc_drm
 
 LOCAL_CFLAGS += -Wno-c++11-narrowing
 

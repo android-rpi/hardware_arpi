@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "composer@2.0-ComposerClient"
+#define LOG_TAG "composer@2.1-ComposerClient"
 //#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
