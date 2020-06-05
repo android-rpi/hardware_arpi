@@ -34,8 +34,8 @@
 #include <hardware/audio.h>
 #include <tinyalsa/asoundlib.h>
 
-#define PCM_CARD 0
-#define PCM_DEVICE 1
+#define PCM_CARD 1
+#define PCM_DEVICE 0
 
 #define DEFAULT_PERIOD_SIZE  1024
 #define DEFAULT_PERIOD_COUNT 4
@@ -659,6 +659,32 @@ static int adev_close(hw_device_t *device)
     return 0;
 }
 
+static void set_mixer() {
+    // Set default mixer ctls
+    // Enable channels and set volume
+    struct mixer* mixer = mixer_open(PCM_CARD);
+    struct mixer_ctl *ctl;
+    for (int i = 0; i < (int)mixer_get_num_ctls(mixer); i++) {
+        ctl = mixer_get_ctl(mixer, i);
+        ALOGD("mixer %d name %s", i, mixer_ctl_get_name(ctl));
+        if (!strcmp(mixer_ctl_get_name(ctl), "Headphone Playback Volume")) {
+            for (int z = 0; z < (int)mixer_ctl_get_num_values(ctl); z++) {
+                ALOGD("set ctl %d to %d", z, 2400);
+                mixer_ctl_set_value(ctl, z, 2400);
+            }
+            continue;
+        }
+        if (!strcmp(mixer_ctl_get_name(ctl), "Headphone Playback Switch")) {
+            for (int z = 0; z < (int)mixer_ctl_get_num_values(ctl); z++) {
+                ALOGD("set ctl %d to %d", z, 1);
+                mixer_ctl_set_value(ctl, z, 1);
+            }
+            continue;
+        }
+    }
+    mixer_close(mixer);
+}
+
 static int adev_open(const hw_module_t* module, const char* name,
                      hw_device_t** device)
 {
@@ -697,6 +723,8 @@ static int adev_open(const hw_module_t* module, const char* name,
     adev->device.dump = adev_dump;
 
     *device = &adev->device.common;
+
+    set_mixer();
 
     return 0;
 }
