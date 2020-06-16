@@ -669,8 +669,8 @@ static void set_mixer() {
         ALOGD("mixer %d name %s", i, mixer_ctl_get_name(ctl));
         if (!strcmp(mixer_ctl_get_name(ctl), "Headphone Playback Volume")) {
             for (int z = 0; z < (int)mixer_ctl_get_num_values(ctl); z++) {
-                ALOGD("set ctl %d to %d", z, 2400);
-                mixer_ctl_set_value(ctl, z, 2400);
+                ALOGD("set ctl %d to %d", z, 1200);
+                mixer_ctl_set_value(ctl, z, 1200);
             }
             continue;
         }
