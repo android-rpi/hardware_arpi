@@ -648,11 +648,12 @@ int hwc_context::init_kms()
 	return 0;
 }
 
-static char const *card0 = "/dev/dri/card0";
-
 hwc_context::hwc_context() {
+    char path[PROPERTY_VALUE_MAX];
+    property_get("gralloc.drm.kms", path, "/dev/dri/card0");
+
     fps = 60.0;
-    kms_fd = open(card0, O_RDWR);
+    kms_fd = open(path, O_RDWR);
    	if (kms_fd > 0) {
    		int error = init_kms();
    	    if (error != 0) {
@@ -666,7 +667,7 @@ hwc_context::hwc_context() {
    	        ydpi = (float)primary_output.ydpi;
    	    }
     } else {
-        ALOGE("hwc_context() failed to open %s", card0);
+        ALOGE("hwc_context() failed to open %s", path);
     }
 }
 
