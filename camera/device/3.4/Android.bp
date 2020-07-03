@@ -1,0 +1,43 @@
+cc_library_shared {
+    name: "camera.device@3.4-external-impl.rpi4",
+    defaults: ["hidl_defaults"],
+    proprietary: true,
+    vendor: true,
+    srcs: [
+        "ExternalCameraDevice.cpp",
+        "ExternalCameraDeviceSession.cpp",
+        "ExternalCameraUtils.cpp",
+    ],
+    shared_libs: [
+        "libhidlbase",
+        "libhidltransport",
+        "libutils",
+        "libcutils",
+        "camera.device@3.2-impl",
+        "camera.device@3.3-impl",
+        "android.hardware.camera.device@3.2",
+        "android.hardware.camera.device@3.3",
+        "android.hardware.camera.device@3.4",
+        "android.hardware.camera.provider@2.4",
+        "android.hardware.graphics.mapper@2.0",
+        "android.hardware.graphics.mapper@3.0",
+        "liblog",
+        "libhardware",
+        "libcamera_metadata",
+        "libfmq",
+        "libsync",
+        "libyuv",
+        "libjpeg",
+        "libexif",
+        "libtinyxml2"
+    ],
+    static_libs: [
+        "android.hardware.camera.common@1.0-helper",
+    ],
+    header_libs: [
+        "camera.device@3.4-external-impl_headers",
+    ],
+    export_shared_lib_headers: [
+        "libfmq",
+    ],
+}

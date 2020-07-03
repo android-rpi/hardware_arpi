@@ -25,7 +25,6 @@
 #include <cutils/properties.h>
 #include "ExternalCameraProviderImpl_2_4.h"
 #include "ExternalCameraDevice_3_4.h"
-#include "ExternalCameraDevice_3_5.h"
 
 namespace android {
 namespace hardware {
@@ -72,7 +71,6 @@ ExternalCameraProviderImpl_2_4::ExternalCameraProviderImpl_2_4() :
     ALOGV("Preferred HAL 3 minor version is %d", mPreferredHal3MinorVersion);
     switch(mPreferredHal3MinorVersion) {
         case 4:
-        case 5:
             // OK
             break;
         default:
@@ -162,12 +160,6 @@ Return<void> ExternalCameraProviderImpl_2_4::getCameraDeviceInterface_V3_x(
         case 4: {
             ALOGV("Constructing v3.4 external camera device");
             deviceImpl = new device::V3_4::implementation::ExternalCameraDevice(
-                    cameraId, mCfg);
-            break;
-        }
-        case 5: {
-            ALOGV("Constructing v3.5 external camera device");
-            deviceImpl = new device::V3_5::implementation::ExternalCameraDevice(
                     cameraId, mCfg);
             break;
         }
@@ -279,7 +271,7 @@ bool ExternalCameraProviderImpl_2_4::HotplugThread::threadLoop() {
         ALOGE("%s: cannot open %s! Exiting threadloop", __FUNCTION__, kDevicePath);
         return false;
     }
-
+    sleep(2); // Wait for CameraService start-up
     struct dirent* de;
     while ((de = readdir(devdir)) != 0) {
         // Find external v4l devices that's existing before we start watching and add them

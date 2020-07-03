@@ -1961,6 +1961,43 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
                     halBuf.acquireFence = relFence;
                 }
             } break;
+            case PixelFormat::RGBA_8888: {
+            	uint32_t stride = halBuf.width * 4;
+                void* outLayout = sHandleImporter.lock(*(halBuf.bufPtr), halBuf.usage,
+                        stride * halBuf.height);
+                ALOGV("%s: RGBA8888 outLayout %p stride %d height %d",
+                        __FUNCTION__, outLayout, stride, halBuf.height);
+
+                YCbCrLayout cropAndScaled;
+                ATRACE_BEGIN("cropAndScaleLocked");
+                int ret = cropAndScaleLocked(
+                        mYu12Frame,
+                        Size { halBuf.width, halBuf.height },
+                        &cropAndScaled);
+                ATRACE_END();
+                if (ret != 0) {
+                    lk.unlock();
+                    return onDeviceError("%s: crop and scale failed!", __FUNCTION__);
+                }
+
+                ret = libyuv::I420ToABGR(
+                        static_cast<uint8_t*>(cropAndScaled.y),
+                        cropAndScaled.yStride,
+                        static_cast<uint8_t*>(cropAndScaled.cb),
+                        cropAndScaled.cStride,
+                        static_cast<uint8_t*>(cropAndScaled.cr),
+                        cropAndScaled.cStride,
+                        static_cast<uint8_t*>(outLayout),
+                        stride, halBuf.width, halBuf.height);
+                if (ret != 0) {
+                    lk.unlock();
+                    return onDeviceError("%s: format coversion to RGBA8888 failed!", __FUNCTION__);
+                }
+                int relFence = sHandleImporter.unlock(*(halBuf.bufPtr));
+                if (relFence >= 0) {
+                    halBuf.acquireFence = relFence;
+                }
+            } break;
             default:
                 lk.unlock();
                 return onDeviceError("%s: unknown output format %x", __FUNCTION__, halBuf.format);
@@ -2199,6 +2236,7 @@ bool ExternalCameraDeviceSession::isSupported(const Stream& stream,
         case PixelFormat::IMPLEMENTATION_DEFINED:
         case PixelFormat::YCBCR_420_888:
         case PixelFormat::YV12:
+        case PixelFormat::RGBA_8888:
             // TODO: check what dataspace we can support here.
             // intentional no-ops.
             break;
@@ -2759,14 +2797,14 @@ Status ExternalCameraDeviceSession::configureStreams(
             case PixelFormat::YCBCR_420_888:
             case PixelFormat::YV12: // Used by SurfaceTexture
             case PixelFormat::Y16:
+            case PixelFormat::RGBA_8888:
                 // No override
                 out->streams[i].v3_2.overrideFormat = config.streams[i].format;
                 break;
             case PixelFormat::IMPLEMENTATION_DEFINED:
                 // Override based on VIDEO or not
                 out->streams[i].v3_2.overrideFormat =
-                        (config.streams[i].usage & BufferUsage::VIDEO_ENCODER) ?
-                        PixelFormat::YCBCR_420_888 : PixelFormat::YV12;
+                		PixelFormat::RGBA_8888;
                 // Save overridden formt in mStreamMap
                 mStreamMap[config.streams[i].id].format = out->streams[i].v3_2.overrideFormat;
                 break;
