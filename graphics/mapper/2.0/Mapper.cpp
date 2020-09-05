@@ -166,11 +166,11 @@ Return<void> Mapper::lock(void* buffer, uint64_t cpuUsage, const IMapper::Rect& 
     aFence->waitForever("Mapper::lock");
 
     void* data = nullptr;
-    int result = drm_lock(bufferHandle, usage, accessRect.left, accessRect.top,
+    int result = drm_lock(mModule, bufferHandle, usage, accessRect.left, accessRect.top,
             accessRect.width, accessRect.height, &data);
-    ALOGV("gralloc0 lock returned %d", result);
 
     if (result != 0) {
+    	ALOGE("drm_lock() returned %d", result);
         hidl_cb(Error::UNSUPPORTED, nullptr);
     } else {
         hidl_cb(error, data);
@@ -179,9 +179,48 @@ Return<void> Mapper::lock(void* buffer, uint64_t cpuUsage, const IMapper::Rect& 
 }
 
 
-Return<void> Mapper::lockYCbCr(void* /*buffer*/, uint64_t /*cpuUsage*/, const IMapper::Rect& /*accessRegion*/,
-                       const hidl_handle& /*acquireFence*/, IMapper::lockYCbCr_cb hidl_cb) {
-    hidl_cb(Error::UNSUPPORTED, YCbCrLayout{});
+Return<void> Mapper::lockYCbCr(void* buffer, uint64_t cpuUsage, const IMapper::Rect& accessRegion,
+                  const hidl_handle& acquireFence, IMapper::lockYCbCr_cb hidl_cb) {
+    const native_handle_t* bufferHandle = static_cast<const native_handle_t*>(buffer);
+    if (!bufferHandle) {
+        hidl_cb(Error::BAD_BUFFER, YCbCrLayout{});
+        return Void();
+    }
+
+    const auto pUsage = static_cast<gralloc1_producer_usage_t>(cpuUsage);
+    const auto cUsage = static_cast<gralloc1_consumer_usage_t>(cpuUsage
+            & ~static_cast<uint64_t>(BufferUsage::CPU_WRITE_MASK));
+    const auto usage = static_cast<int32_t>(pUsage | cUsage);
+
+    const auto accessRect = gralloc1_rect_t{accessRegion.left, accessRegion.top,
+                 accessRegion.width, accessRegion.height};
+
+    base::unique_fd fenceFd;
+    Error error = getFenceFd(acquireFence, &fenceFd);
+    if (error != Error::NONE) {
+        hidl_cb(error, YCbCrLayout{});
+        return Void();
+    }
+    sp<Fence> aFence{new Fence(fenceFd.release())};
+    aFence->waitForever("Mapper::lockYCbCr");
+
+    android_ycbcr ycbcr = {};
+    int result = drm_lock_ycbcr(mModule, bufferHandle, usage, accessRect.left, accessRect.top,
+            accessRect.width, accessRect.height, &ycbcr);
+
+    if (result != 0) {
+    	ALOGE("drm_lock_ycbcr() returned %d", result);
+        hidl_cb(Error::UNSUPPORTED, YCbCrLayout{});
+    } else {
+        YCbCrLayout layout{};
+        layout.y = ycbcr.y;
+        layout.cb = ycbcr.cb;
+        layout.cr = ycbcr.cr;
+        layout.yStride = ycbcr.ystride;
+        layout.cStride = ycbcr.cstride;
+        layout.chromaStep = ycbcr.chroma_step;
+        hidl_cb(error, layout);
+    }
     return Void();
 }
 

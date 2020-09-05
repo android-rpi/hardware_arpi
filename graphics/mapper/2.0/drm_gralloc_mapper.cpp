@@ -26,10 +26,11 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <sys/errno.h>
+#include <string>
 
 #include "drm_gralloc_mapper.h"
 
-int drm_init(struct drm_module_t *mod) {
+static int drm_init(struct drm_module_t *mod) {
 	int err = 0;
 	if (!mod->drm) {
 		mod->drm = gralloc_drm_create();
@@ -40,31 +41,59 @@ int drm_init(struct drm_module_t *mod) {
 }
 
 int drm_register(struct drm_module_t *mod, buffer_handle_t handle) {
-	int err = drm_init(mod);
-	if (err)
-		return err;
-	return gralloc_drm_handle_register(handle, mod->drm);
+	pthread_mutex_lock(&mod->mutex);
+	int ret = drm_init(mod);
+	if (ret == 0) {
+	    ret = gralloc_drm_handle_register(handle, mod->drm);
+	}
+	pthread_mutex_unlock(&mod->mutex);
+	return ret;
 }
 
 int drm_unregister(buffer_handle_t handle) {
 	return gralloc_drm_handle_unregister(handle);
 }
 
-int drm_lock(buffer_handle_t handle, int usage, int x, int y, int w, int h, void **ptr) {
-	struct gralloc_drm_bo_t *bo;
-	bo = gralloc_drm_bo_from_handle(handle);
-	if (!bo)
-		return -EINVAL;
-	return gralloc_drm_bo_lock(bo, usage, x, y, w, h, ptr);
+int drm_lock(struct drm_module_t *mod, buffer_handle_t handle, int usage, int x, int y, int w, int h, void **ptr) {
+	pthread_mutex_lock(&mod->mutex);
+	int ret = 0;
+
+	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
+	if (!bo) {
+		ret = -EINVAL;
+	} else {
+	    ret = gralloc_drm_bo_lock(bo, usage, x, y, w, h, ptr);
+	}
+
+	pthread_mutex_unlock(&mod->mutex);
+	return ret;
+}
+
+int drm_lock_ycbcr(struct drm_module_t *mod, buffer_handle_t handle, int usage, int x, int y, int w, int h,
+		struct android_ycbcr *ycbcr) {
+	pthread_mutex_lock(&mod->mutex);
+	int ret = 0;
+
+	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
+	if (!bo) {
+		ret = -EINVAL;
+	} else {
+	    ret = gralloc_drm_bo_lock_ycbcr(bo, usage, x, y, w, h, ycbcr);
+	}
+
+	pthread_mutex_unlock(&mod->mutex);
+	return ret;
 }
 
 int drm_unlock(buffer_handle_t handle) {
-	struct gralloc_drm_bo_t *bo;
-	bo = gralloc_drm_bo_from_handle(handle);
-	if (!bo)
-		return -EINVAL;
-	gralloc_drm_bo_unlock(bo);
-	return 0;
+	int ret = 0;
+	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
+	if (!bo) {
+		ret = -EINVAL;
+	} else {
+		gralloc_drm_bo_unlock(bo);
+	}
+	return ret;
 }
 
 
