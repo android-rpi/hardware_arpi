@@ -166,7 +166,7 @@ bool ComposerCommandEngine::executeSetClientTarget(uint16_t length) {
     bool closeFence = true;
 
     const native_handle_t* clientTarget;
-    ComposerResources::ReplacedBufferHandle replacedClientTarget;
+    ComposerResources::ReplacedHandle replacedClientTarget(true);
     auto err = mResources->getDisplayClientTarget(mCurrentDisplay, slot, useCache, rawHandle,
                                                   &clientTarget, &replacedClientTarget);
     if (err == Error::NONE) {

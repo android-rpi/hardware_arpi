@@ -18,7 +18,7 @@
 
 #include <android/hardware/graphics/composer/2.1/IComposerClient.h>
 #include <android/hardware/graphics/composer/2.1/IComposerCallback.h>
-#include <composer-hal/2.1/ComposerResources.h>
+#include <composer-resources/2.1/ComposerResources.h>
 
 #include "ComposerHal.h"
 #include "ComposerCommandEngine.h"

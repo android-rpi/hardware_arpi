@@ -20,6 +20,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SHARED_LIBRARIES := \
         android.hardware.graphics.composer@2.1 \
+        android.hardware.graphics.composer@2.1-resources \
         android.hardware.graphics.mapper@2.0 \
         android.hardware.graphics.mapper@3.0 \
         android.hardware.graphics.common@1.0 \

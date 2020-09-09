@@ -17,7 +17,7 @@
 #pragma once
 
 #include <composer-command-buffer/2.1/ComposerCommandBuffer.h>
-#include <composer-hal/2.1/ComposerResources.h>
+#include <composer-resources/2.1/ComposerResources.h>
 
 #include "ComposerHal.h"
 
