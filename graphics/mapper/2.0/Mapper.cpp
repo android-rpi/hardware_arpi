@@ -166,7 +166,7 @@ Return<void> Mapper::lock(void* buffer, uint64_t cpuUsage, const IMapper::Rect& 
     aFence->waitForever("Mapper::lock");
 
     void* data = nullptr;
-    int result = drm_lock(mModule, bufferHandle, usage, accessRect.left, accessRect.top,
+    int result = drm_lock(bufferHandle, usage, accessRect.left, accessRect.top,
             accessRect.width, accessRect.height, &data);
 
     if (result != 0) {
@@ -205,7 +205,7 @@ Return<void> Mapper::lockYCbCr(void* buffer, uint64_t cpuUsage, const IMapper::R
     aFence->waitForever("Mapper::lockYCbCr");
 
     android_ycbcr ycbcr = {};
-    int result = drm_lock_ycbcr(mModule, bufferHandle, usage, accessRect.left, accessRect.top,
+    int result = drm_lock_ycbcr(bufferHandle, usage, accessRect.left, accessRect.top,
             accessRect.width, accessRect.height, &ycbcr);
 
     if (result != 0) {

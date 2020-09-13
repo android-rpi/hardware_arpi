@@ -54,34 +54,26 @@ int drm_unregister(buffer_handle_t handle) {
 	return gralloc_drm_handle_unregister(handle);
 }
 
-int drm_lock(struct drm_module_t *mod, buffer_handle_t handle, int usage, int x, int y, int w, int h, void **ptr) {
-	pthread_mutex_lock(&mod->mutex);
+int drm_lock(buffer_handle_t handle, int usage, int x, int y, int w, int h, void **ptr) {
 	int ret = 0;
-
 	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
 	if (!bo) {
 		ret = -EINVAL;
 	} else {
 	    ret = gralloc_drm_bo_lock(bo, usage, x, y, w, h, ptr);
 	}
-
-	pthread_mutex_unlock(&mod->mutex);
 	return ret;
 }
 
-int drm_lock_ycbcr(struct drm_module_t *mod, buffer_handle_t handle, int usage, int x, int y, int w, int h,
+int drm_lock_ycbcr(buffer_handle_t handle, int usage, int x, int y, int w, int h,
 		struct android_ycbcr *ycbcr) {
-	pthread_mutex_lock(&mod->mutex);
 	int ret = 0;
-
 	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
 	if (!bo) {
 		ret = -EINVAL;
 	} else {
 	    ret = gralloc_drm_bo_lock_ycbcr(bo, usage, x, y, w, h, ycbcr);
 	}
-
-	pthread_mutex_unlock(&mod->mutex);
 	return ret;
 }
 

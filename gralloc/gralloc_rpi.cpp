@@ -44,22 +44,17 @@ static int drm_mod_perform(struct gralloc_module_t const* mod, int op, ...)
 	return err;
 }
 
-static int drm_mod_lock_ycbcr(struct gralloc_module_t const* mod,
+static int drm_mod_lock_ycbcr(struct gralloc_module_t const* /*mod*/,
 		buffer_handle_t handle, int usage,
 		int x, int y, int w, int h, struct android_ycbcr *ycbcr)
 {
-	struct drm_module_t *dmod = (struct drm_module_t *) mod;
-	pthread_mutex_lock(&dmod->mutex);
 	int ret = 0;
-
 	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
 	if (!bo) {
 		ret = -EINVAL;
 	} else {
 	    ret = gralloc_drm_bo_lock_ycbcr(bo, usage, x, y, w, h, ycbcr);
 	}
-
-	pthread_mutex_unlock(&dmod->mutex);
 	return ret;
 }
 
