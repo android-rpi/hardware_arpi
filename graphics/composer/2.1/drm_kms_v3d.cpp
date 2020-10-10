@@ -318,7 +318,7 @@ void hwc_context::init_features()
 
 	ctx_singleton = this;
 
-	ALOGD("will use flip for fb posting");
+	ALOGV("will use flip for fb posting");
 }
 
 #define MARGIN_PERCENT 1.8   /* % of active vertical image*/
@@ -406,35 +406,34 @@ static drmModeModeInfoPtr generate_mode(int h_pixels, int v_lines, float freq)
 	m->vtotal = (int) (total_v_lines);
 	m->vscan = 0;
 	m->vrefresh = freq;
-	m->flags = 10;
-	m->type = 64;
+	m->flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC;
+	m->type = DRM_MODE_TYPE_DRIVER;
 
 	return (m);
 }
 
-static drmModeModeInfoPtr find_mode(drmModeConnectorPtr connector, int *bpp)
+static drmModeModeInfoPtr find_mode(drmModeConnectorPtr connector)
 {
 	char value[PROPERTY_VALUE_MAX];
 	drmModeModeInfoPtr mode;
-	int dist, i;
+	int dist = INT_MAX, i;
 	int xres = 0, yres = 0, rate = 0;
 	int forcemode = 0;
+	int found_prop_match = 0;
 
 	if (property_get("debug.drm.mode", value, NULL)) {
-		/* parse <xres>x<yres>[@<bpp>] */
-		if (sscanf(value, "%dx%d@%d", &xres, &yres, bpp) != 3) {
-			*bpp = 0;
+		/* parse <xres>x<yres>[@<refreshrate>] */
+		if (sscanf(value, "%dx%d@%d", &xres, &yres, &rate) != 3) {
+			rate = 60;
 			if (sscanf(value, "%dx%d", &xres, &yres) != 2)
 				xres = yres = 0;
 		}
 
-		if ((xres && yres) || *bpp) {
-			ALOGI("will find the closest match for %dx%d@%d",
-					xres, yres, *bpp);
+		if (xres && yres) {
+			ALOGV("will find the closest match for %dx%d",
+					xres, yres);
 		}
 	} else if (property_get("debug.drm.mode.force", value, NULL)) {
-		*bpp = 0;
-
 		/* parse <xres>x<yres>[@<refreshrate>] */
 		if (sscanf(value, "%dx%d@%d", &xres, &yres, &rate) != 3) {
 			rate = 60;
@@ -443,51 +442,65 @@ static drmModeModeInfoPtr find_mode(drmModeConnectorPtr connector, int *bpp)
 		}
 
 		if (xres && yres && rate) {
-			ALOGI("will use %dx%d@%dHz", xres, yres, rate);
+			ALOGV("will use %dx%d@%dHz", xres, yres, rate);
 			forcemode = 1;
 		}
-	} else {
-		*bpp = 0;
 	}
 
-	dist = INT_MAX;
-
-	if (forcemode)
-		mode = generate_mode(xres, yres, rate);
-	else {
-		mode = NULL;
+	if (xres && yres && rate) {
 		for (i = 0; i < connector->count_modes; i++) {
 			drmModeModeInfoPtr m = &connector->modes[i];
-			int tmp;
-
-			if (xres && yres) {
-				tmp = (m->hdisplay - xres) * (m->hdisplay - xres) +
-					(m->vdisplay - yres) * (m->vdisplay - yres);
-			}
-			else {
-				/* use the first preferred mode */
-				tmp = (m->type & DRM_MODE_TYPE_PREFERRED) ? 0 : dist;
-			}
-
-			if (tmp < dist) {
+			if ((m->hdisplay == xres) && (m->vdisplay == yres)
+					&& (m->vrefresh == rate)) {
 				mode = m;
-				dist = tmp;
-				if (!dist)
-					break;
+				found_prop_match = 1;
+				ALOGV("Found property match %dx%d@%dHz", xres, yres, rate);
+				break;
 			}
 		}
 	}
 
-	/* fallback to the first mode */
-	if (!mode)
-		mode = &connector->modes[0];
+	if (!found_prop_match) {
+		if (forcemode)
+			mode = generate_mode(xres, yres, rate);
+		else {
+			mode = NULL;
+			for (i = 0; i < connector->count_modes; i++) {
+				drmModeModeInfoPtr m = &connector->modes[i];
+				int tmp;
 
-	ALOGI("Established mode:");
-	ALOGI("clock: %d, hdisplay: %d, hsync_start: %d, hsync_end: %d, htotal: %d, hskew: %d", mode->clock, mode->hdisplay, mode->hsync_start, mode->hsync_end, mode->htotal, mode->hskew);
-	ALOGI("vdisplay: %d, vsync_start: %d, vsync_end: %d, vtotal: %d, vscan: %d, vrefresh: %d", mode->vdisplay, mode->vsync_start, mode->vsync_end, mode->vtotal, mode->vscan, mode->vrefresh);
-	ALOGI("flags: %d, type: %d, name %s", mode->flags, mode->type, mode->name);
+				if (xres && yres) {
+					tmp = (m->hdisplay - xres) * (m->hdisplay - xres) +
+							(m->vdisplay - yres) * (m->vdisplay - yres);
+				}
+				else {
+					/* use the first preferred mode */
+					tmp = (m->type & DRM_MODE_TYPE_PREFERRED) ? 0 : dist;
+				}
 
-	*bpp /= 8;
+				if (tmp < dist) {
+					mode = m;
+					dist = tmp;
+					if (!dist)
+						break;
+				}
+			}
+		}
+		/* fallback to the first mode */
+		if (!mode)
+			mode = &connector->modes[0];
+	}
+
+	if ((74200 <= mode->clock) && (mode->clock < 74500)) {
+		// Avoid interference with Wifi
+		ALOGV("Trim display clock from %d to 75000", mode->clock);
+		mode->clock = 75000;
+	}
+
+	ALOGV("Established mode:");
+	ALOGV("clock: %d, hdisplay: %d, hsync_start: %d, hsync_end: %d, htotal: %d, hskew: %d", mode->clock, mode->hdisplay, mode->hsync_start, mode->hsync_end, mode->htotal, mode->hskew);
+	ALOGV("vdisplay: %d, vsync_start: %d, vsync_end: %d, vtotal: %d, vscan: %d, vrefresh: %d", mode->vdisplay, mode->vsync_start, mode->vsync_end, mode->vtotal, mode->vscan, mode->vrefresh);
+	ALOGV("flags: %d, type: %d, name %s", mode->flags, mode->type, mode->name);
 
 	return mode;
 }
@@ -500,7 +513,7 @@ int hwc_context::init_with_connector(struct kms_output *output,
 	drmModeEncoderPtr encoder;
 	drmModeModeInfoPtr mode;
 	static int used_crtcs = 0;
-	int bpp, i;
+	int i;
 
 	encoder = drmModeGetEncoder(kms_fd, connector->encoders[0]);
 	if (!encoder)
@@ -528,22 +541,16 @@ int hwc_context::init_with_connector(struct kms_output *output,
 		connector->count_modes,
 		connector->connector_id,
 		connector->connector_type);
-	for (i = 0; i < connector->count_modes; i++)
-		ALOGI("  %s", connector->modes[i].name);
+	for (i = 0; i < connector->count_modes; i++) {
+		ALOGV("  %s@%dHz flags:0x%x type:0x%x", connector->modes[i].name, connector->modes[i].vrefresh,
+				connector->modes[i].flags, connector->modes[i].type);
+	}
 
-	mode = find_mode(connector, &bpp);
+	mode = find_mode(connector);
 	ALOGI("the best mode is %s", mode->name);
 
 	output->mode = *mode;
-	switch (bpp) {
-	case 2:
-		output->fb_format = HAL_PIXEL_FORMAT_RGB_565;
-		break;
-	case 4:
-	default:
-		output->fb_format = HAL_PIXEL_FORMAT_RGBA_8888;
-		break;
-	}
+	output->fb_format = HAL_PIXEL_FORMAT_RGBA_8888;
 
 	if (connector->mmWidth && connector->mmHeight) {
 		output->xdpi = (output->mode.hdisplay * 25.4 / connector->mmWidth);
@@ -683,9 +690,9 @@ int hwc_context::hwc_post(buffer_handle_t handle)
 	if (!bo)
 		return -EINVAL;
 
-	ALOGV("hwc_post() %s, prime_fd %d, fb_id %d",
-			bo->handle->usage & GRALLOC_USAGE_HW_FB ? "USAGE_HW_FB" : " ",
-			bo->handle->prime_fd, bo->fb_id);
+	//ALOGV("hwc_post() %s, prime_fd %d, fb_id %d",
+	//		bo->handle->usage & GRALLOC_USAGE_HW_FB ? "USAGE_HW_FB" : " ",
+	//		bo->handle->prime_fd, bo->fb_id);
 
 	return bo_post(bo);
 }
