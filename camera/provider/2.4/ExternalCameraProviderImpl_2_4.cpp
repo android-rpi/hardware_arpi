@@ -271,7 +271,7 @@ bool ExternalCameraProviderImpl_2_4::HotplugThread::threadLoop() {
         ALOGE("%s: cannot open %s! Exiting threadloop", __FUNCTION__, kDevicePath);
         return false;
     }
-    sleep(2); // Wait for CameraService start-up
+    sleep(3); // Wait for CameraService start-up
     struct dirent* de;
     while ((de = readdir(devdir)) != 0) {
         // Find external v4l devices that's existing before we start watching and add them
