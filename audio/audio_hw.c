@@ -37,6 +37,10 @@
 #define PCM_CARD 0
 #define PCM_DEVICE 0
 
+#define PCM_IN_CARD_NAME "sndrpii2scard"
+#define PCM_IN_CARD_DEFAULT 1
+#define PCM_IN_DEVICE 0
+
 #define DEFAULT_PERIOD_SIZE  1024
 #define DEFAULT_PERIOD_COUNT 4
 
@@ -55,6 +59,14 @@ struct pcm_config pcm_config_out = {
     .period_size = DEFAULT_PERIOD_SIZE,
     .period_count = DEFAULT_PERIOD_COUNT,
     .format = PCM_FORMAT_S16_LE,
+};
+
+struct pcm_config pcm_config_in = {
+    .channels = 2,
+    .rate = STUB_DEFAULT_SAMPLE_RATE,
+    .period_size = DEFAULT_PERIOD_SIZE,
+    .period_count = DEFAULT_PERIOD_COUNT,
+    .format = PCM_FORMAT_S32_LE,
 };
 
 struct stub_audio_device {
@@ -79,11 +91,19 @@ struct stub_stream_out {
 
 struct stub_stream_in {
     struct audio_stream_in stream;
-    int64_t last_read_time_us;
     uint32_t sample_rate;
     audio_channel_mask_t channel_mask;
     audio_format_t format;
     size_t frame_count;
+
+    pthread_mutex_t lock;
+    struct pcm_config *config;
+    struct pcm *pcm;
+    bool standby;
+    struct stub_audio_device *dev;
+    uint32_t pcm_card;
+
+    void *raw_buf;
 };
 
 static int check_output_config(struct audio_config *audio_config) {
@@ -96,6 +116,18 @@ static int check_output_config(struct audio_config *audio_config) {
         return 0;
     } else {   
         ALOGD("check_output_config(sample_rate=%d, format=%d, channel_mask=%d)",
+                sample_rate, format, channel_mask);
+        return -EINVAL;
+    }
+}
+
+static int check_input_parameters(uint32_t sample_rate, audio_format_t format,
+                                  audio_channel_mask_t channel_mask) {
+    if ((sample_rate == STUB_DEFAULT_SAMPLE_RATE) && (format == STUB_DEFAULT_AUDIO_FORMAT) &&
+            (channel_mask == STUB_INPUT_DEFAULT_CHANNEL_MASK)) {
+        return 0;
+    } else {
+        ALOGD("check_input_parameters(sample_rate=%d, format=%d, channel_mask=%d)",
                 sample_rate, format, channel_mask);
         return -EINVAL;
     }
@@ -115,6 +147,22 @@ static int start_output_stream(struct stub_stream_out *out)
         return -ENOMEM;
     }
     ALOGV("%s exit",__func__);
+    return 0;
+}
+
+static int start_input_stream(struct stub_stream_in *in)
+{
+    ALOGV("start_input_stream");
+    in->pcm = pcm_open(in->pcm_card, PCM_IN_DEVICE, PCM_IN, in->config);
+    if (in->pcm == NULL) {
+        return -ENOMEM;
+    }
+    if (!pcm_is_ready(in->pcm)) {
+        ALOGE("pcm_open(in) failed: %s", pcm_get_error(in->pcm));
+        pcm_close(in->pcm);
+        in->pcm = NULL;
+        return -ENOMEM;
+    }
     return 0;
 }
 
@@ -349,11 +397,27 @@ static int in_set_format(struct audio_stream *stream, audio_format_t format)
     return 0;
 }
 
+static int do_input_standby(struct stub_stream_in *in)
+{
+    if (!in->standby) {
+        pcm_close(in->pcm);
+        in->pcm = NULL;
+        in->standby = true;
+    }
+    return 0;
+}
+
 static int in_standby(struct audio_stream *stream)
 {
     struct stub_stream_in *in = (struct stub_stream_in *)stream;
-    in->last_read_time_us = 0;
-    return 0;
+    int status;
+    ALOGV("in_standby");
+    pthread_mutex_lock(&in->dev->lock);
+    pthread_mutex_lock(&in->lock);
+    status = do_input_standby(in);
+    pthread_mutex_unlock(&in->lock);
+    pthread_mutex_unlock(&in->dev->lock);
+    return status;
 }
 
 static int in_dump(const struct audio_stream *stream, int fd)
@@ -377,36 +441,44 @@ static int in_set_gain(struct audio_stream_in *stream, float gain)
     return 0;
 }
 
+static void copy32to16(void *dest, void *src, size_t bytes) {
+    uint16_t *dest16 = (uint16_t *)dest;
+    uint16_t *src32 = (uint16_t *)src;
+    for(size_t i=0; i < (bytes/2); i++) {
+        dest16[i] = src32[2*i + 1];
+    }
+}
+
 static ssize_t in_read(struct audio_stream_in *stream, void* buffer,
                        size_t bytes)
 {
+    struct stub_stream_in *in = (struct stub_stream_in *)stream;
+    struct stub_audio_device *adev = in->dev;
+    int ret = 0;
+
     ALOGV("in_read: bytes %zu", bytes);
 
-    /* XXX: fake timing for audio input */
-    struct stub_stream_in *in = (struct stub_stream_in *)stream;
-    struct timespec t = { .tv_sec = 0, .tv_nsec = 0 };
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    const int64_t now = (t.tv_sec * 1000000000LL + t.tv_nsec) / 1000;
-
-    // we do a full sleep when exiting standby.
-    const bool standby = in->last_read_time_us == 0;
-    const int64_t elapsed_time_since_last_read = standby ?
-            0 : now - in->last_read_time_us;
-    int64_t sleep_time = bytes * 1000000LL / audio_stream_in_frame_size(stream) /
-            in_get_sample_rate(&stream->common) - elapsed_time_since_last_read;
-    if (sleep_time > 0) {
-        usleep(sleep_time);
-    } else {
-        sleep_time = 0;
+    pthread_mutex_lock(&in->lock);
+    if (in->standby) {
+        pthread_mutex_lock(&adev->lock);
+        ret = start_input_stream(in);
+        pthread_mutex_unlock(&adev->lock);
+        if (ret != 0) {
+            goto exit;
+        }
+        in->standby = false;
     }
-    in->last_read_time_us = now + sleep_time;
-    // last_read_time_us is an approximation of when the (simulated) alsa
-    // buffer is drained by the read, and is empty.
-    //
-    // On the subsequent in_read(), we measure the elapsed time spent in
-    // the recording thread. This is subtracted from the sleep estimate based on frames,
-    // thereby accounting for fill in the alsa buffer during the interim.
-    memset(buffer, 0, bytes);
+
+    ret = pcm_read(in->pcm, in->raw_buf, bytes * 2);
+    if (ret != 0) {
+        ALOGE("pcm_read() returned error %d : %s", ret, pcm_get_error(in->pcm));
+        memset(buffer, 0 , bytes);
+    } else {
+        copy32to16(buffer, in->raw_buf, bytes);
+    }
+
+exit:
+    pthread_mutex_unlock(&in->lock);
     return bytes;
 }
 
@@ -589,6 +661,24 @@ static size_t adev_get_input_buffer_size(const struct audio_hw_device *dev,
     return buffer_size;
 }
 
+static uint32_t probe_pcm_in_card() {
+    FILE *fp;
+    char card_info[128];
+    if((fp = fopen("/proc/asound/cards","r")) == NULL) {
+        ALOGE("Cannot open /proc/asound/cards file to get sound card info");
+    } else {
+        while((fgets(card_info, sizeof(card_info), fp) != NULL)) {
+            ALOGV("/proc/asound/cards readout : %s", card_info);
+            if (strstr(card_info, PCM_IN_CARD_NAME)) {
+                fclose(fp);
+                return card_info[1]-'0';
+            }
+        }
+        fclose(fp);
+    }
+    return PCM_IN_CARD_DEFAULT;
+}
+
 static int adev_open_input_stream(struct audio_hw_device *dev,
                                   audio_io_handle_t handle,
                                   audio_devices_t devices,
@@ -600,10 +690,22 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
 {
     ALOGV("adev_open_input_stream...");
 
+    int ret = check_input_parameters(config->sample_rate, config->format,
+           config->channel_mask);
+    if (ret != 0) return ret;
+
     *stream_in = NULL;
     struct stub_stream_in *in = (struct stub_stream_in *)calloc(1, sizeof(struct stub_stream_in));
     if (!in)
         return -ENOMEM;
+
+    in->raw_buf = calloc(2, adev_get_input_buffer_size(NULL, config));
+    if (!in->raw_buf) {
+        free(in);
+        return -ENOMEM;
+    }
+
+    in->pcm_card = probe_pcm_in_card();
 
     in->stream.common.get_sample_rate = in_get_sample_rate;
     in->stream.common.set_sample_rate = in_set_sample_rate;
@@ -632,6 +734,10 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
     in->frame_count = samples_per_milliseconds(
                           STUB_INPUT_BUFFER_MILLISECONDS, in->sample_rate, 1);
 
+    in->config = &pcm_config_in;
+    in->dev = (struct stub_audio_device *)dev;
+    in->standby = true;
+
     ALOGV("adev_open_input_stream: sample_rate: %u, channels: %x, format: %d,"
           "frames: %zu", in->sample_rate, in->channel_mask, in->format,
           in->frame_count);
@@ -643,7 +749,11 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
                                    struct audio_stream_in *in)
 {
     ALOGV("adev_close_input_stream...");
-    return;
+    in_standby(&in->common);
+
+    struct stub_stream_in *sin = (struct stub_stream_in *)in;
+    free(sin->raw_buf);
+    free(in);
 }
 
 static int adev_dump(const audio_hw_device_t *device, int fd)
