@@ -19,7 +19,8 @@ LOCAL_C_INCLUDES := \
     external/libdrm/include/drm
 
 LOCAL_SHARED_LIBRARIES := \
-    libgralloc_drm
+    libgralloc_drm \
+    liblog
 
 LOCAL_CFLAGS += -Wno-c++11-narrowing
 
