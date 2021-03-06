@@ -136,6 +136,17 @@ static void page_flip_handler(int /*fd*/, unsigned int /*sequence*/,
 	ctx->next_front = NULL;
 }
 
+static void page_flip_handler2(int /*fd*/, unsigned int /*sequence*/,
+			      unsigned int /*tv_sec*/, unsigned int /*tv_usec*/,
+		void *user_data)
+{
+	class hwc_context *ctx = (class hwc_context *) user_data;
+
+	/* ack the last scheduled flip */
+	ctx->current_front2 = ctx->next_front2;
+	ctx->next_front2 = NULL;
+}
+
 /*
  * Schedule a page flip.
  */
@@ -170,6 +181,41 @@ int hwc_context::page_flip(struct gralloc_drm_bo_t *bo)
 	}
 	else
 		next_front = bo;
+
+	return ret;
+}
+
+int hwc_context::page_flip2(struct gralloc_drm_bo_t *bo)
+{
+	int ret;
+
+	/* there is another flip pending */
+	while (next_front2) {
+		waiting_flip2 = 1;
+		drmHandleEvent(kms_fd, &evctx2);
+		waiting_flip2 = 0;
+		if (next_front2) {
+			/* record an error and break */
+			ALOGE("drmHandleEvent returned without flipping");
+			current_front2 = next_front2;
+			next_front2 = NULL;
+		}
+	}
+
+	if (!bo)
+		return 0;
+
+	ret = drmModePageFlip(kms_fd, secondary_output.crtc_id, bo->fb_id,
+			DRM_MODE_PAGE_FLIP_EVENT, (void *) this);
+	if (ret) {
+		ALOGE("failed to perform page flip for primary (%s) (crtc %d fb %d))",
+			strerror(errno), secondary_output.crtc_id, bo->fb_id);
+		/* try to set mode for next frame */
+		if (errno != EBUSY)
+			first_post2 = 1;
+	}
+	else
+		next_front2 = bo;
 
 	return ret;
 }
@@ -225,6 +271,54 @@ void hwc_context::wait_for_post(int flip)
 	last_swap = vbl.reply.sequence + flip;
 }
 
+void hwc_context::wait_for_post2(int flip)
+{
+	unsigned int current, target;
+	drmVBlank vbl;
+	int ret;
+
+	flip = !!flip;
+
+	memset(&vbl, 0, sizeof(vbl));
+	int type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = (drmVBlankSeqType) type;
+	vbl.request.sequence = 0;
+
+	/* get the current vblank */
+	ret = drmWaitVBlank(kms_fd, &vbl);
+	if (ret) {
+		ALOGW("failed to get vblank");
+		return;
+	}
+
+	current = vbl.reply.sequence;
+	if (first_post2)
+		target = current;
+	else
+		target = last_swap2 + swap_interval - flip;
+
+	/* wait for vblank */
+	if (current < target || !flip) {
+		memset(&vbl, 0, sizeof(vbl));
+		int type = DRM_VBLANK_ABSOLUTE;
+		if (!flip) {
+			type |= DRM_VBLANK_NEXTONMISS;
+			if (target < current)
+				target = current;
+		}
+                vbl.request.type = (drmVBlankSeqType) type;
+		vbl.request.sequence = target;
+
+		ret = drmWaitVBlank(kms_fd, &vbl);
+		if (ret) {
+			ALOGW("failed to wait vblank");
+			return;
+		}
+	}
+
+	last_swap2 = vbl.reply.sequence + flip;
+}
+
 /*
  * Post a bo.  This is not thread-safe.
  */
@@ -269,6 +363,47 @@ int hwc_context::bo_post(struct gralloc_drm_bo_t *bo)
 	return ret;
 }
 
+int hwc_context::bo_post2(struct gralloc_drm_bo_t *bo)
+{
+	int ret;
+
+	if (!bo->fb_id) {
+		int err = bo_add_fb(bo);
+		if (err) {
+			ALOGE("%s: could not create drm fb, (%s)",
+				__func__, strerror(-err));
+			ALOGE("unable to post bo %p without fb", bo);
+			return err;
+		}
+	}
+
+	/* TODO spawn a thread to avoid waiting and race */
+
+	if (first_post2) {
+		ret = set_crtc(&secondary_output, bo->fb_id);
+		if (!ret) {
+			first_post2 = 0;
+			current_front2 = bo;
+			if (next_front2 == bo)
+				next_front2 = NULL;
+		}
+		return ret;
+	}
+
+	if (swap_interval > 1)
+		wait_for_post2(1);
+	ret = page_flip2(bo);
+	if (next_front2) {
+		/*
+		 * wait if the driver says so or the current front
+		 * will be written by CPU
+		 */
+		page_flip2(NULL);
+	}
+
+	return ret;
+}
+
 static class hwc_context *ctx_singleton;
 
 static void on_signal(int /*sig*/)
@@ -282,6 +417,14 @@ static void on_signal(int /*sig*/)
 			usleep(100 * 1000); /* 100ms */
 		else
 			ctx->page_flip(NULL);
+	}
+
+	if (ctx && ctx->next_front2) {
+		/* there is race, but this function is hacky enough to ignore that */
+		if (ctx->waiting_flip2)
+			usleep(100 * 1000); /* 100ms */
+		else
+			ctx->page_flip2(NULL);
 	}
 
 	exit(-1);
@@ -304,6 +447,10 @@ void hwc_context::init_features()
 	memset(&evctx, 0, sizeof(evctx));
 	evctx.version = DRM_EVENT_CONTEXT_VERSION;
 	evctx.page_flip_handler = page_flip_handler;
+
+	memset(&evctx2, 0, sizeof(evctx2));
+	evctx2.version = DRM_EVENT_CONTEXT_VERSION;
+	evctx2.page_flip_handler = page_flip_handler2;
 
 	/*
 	 * XXX GPU tends to freeze if the program is terminiated with a
@@ -571,11 +718,36 @@ int hwc_context::init_with_connector(struct kms_output *output,
 drmModeConnectorPtr hwc_context::fetch_connector(uint32_t type)
 {
 	int i;
+	primary_connector = -1;
 
 	if (!resources)
 		return NULL;
 
 	for (i = 0; i < resources->count_connectors; i++) {
+		drmModeConnectorPtr connector =
+			connector = drmModeGetConnector(kms_fd,
+				resources->connectors[i]);
+		if (connector) {
+			if (connector->connector_type == type &&
+				connector->connection == DRM_MODE_CONNECTED) {
+				primary_connector = i;
+				return connector;
+			}
+			drmModeFreeConnector(connector);
+		}
+	}
+	return NULL;
+}
+
+drmModeConnectorPtr hwc_context::fetch_connector2(uint32_t type)
+{
+	int i;
+
+	if (!resources)
+		return NULL;
+
+	for (i = 0; i < resources->count_connectors; i++) {
+		if (i == primary_connector) continue;
 		drmModeConnectorPtr connector =
 			connector = drmModeGetConnector(kms_fd,
 				resources->connectors[i]);
@@ -595,6 +767,7 @@ drmModeConnectorPtr hwc_context::fetch_connector(uint32_t type)
 int hwc_context::init_kms()
 {
 	drmModeConnectorPtr primary;
+	drmModeConnectorPtr secondary;
 	int i;
 
 	resources = drmModeGetResources(kms_fd);
@@ -609,6 +782,12 @@ int hwc_context::init_kms()
 		init_with_connector(&primary_output, primary);
 		drmModeFreeConnector(primary);
 		primary_output.active = 1;
+		secondary = fetch_connector2(DRM_MODE_CONNECTOR_HDMIA);
+		if (secondary) {
+			init_with_connector(&secondary_output, secondary);
+			drmModeFreeConnector(secondary);
+			secondary_output.active = 1;
+		}
 	}
 
 	/* if still no connector, find first connected connector and try it */
@@ -652,6 +831,7 @@ int hwc_context::init_kms()
 
 	init_features();
 	first_post = 1;
+	first_post2 = 1;
 	return 0;
 }
 
@@ -678,7 +858,7 @@ hwc_context::hwc_context() {
     }
 }
 
-int hwc_context::hwc_post(buffer_handle_t handle)
+int hwc_context::hwc_post(hwc2_display_t display_id, buffer_handle_t handle)
 {
 	struct gralloc_drm_handle_t *drm_handle = gralloc_drm_handle(handle);
 
@@ -694,7 +874,16 @@ int hwc_context::hwc_post(buffer_handle_t handle)
 	//		bo->handle->usage & GRALLOC_USAGE_HW_FB ? "USAGE_HW_FB" : " ",
 	//		bo->handle->prime_fd, bo->fb_id);
 
-	return bo_post(bo);
+    if (display_id == 0) {
+        return bo_post(bo);
+    } else if (display_id == 1) {
+        return bo_post2(bo);
+    } else
+    return -EINVAL;
+}
+
+bool hwc_context::is_display2_active() {
+    return (secondary_output.active == 1);
 }
 
 } // namespace anroid

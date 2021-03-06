@@ -141,7 +141,8 @@ Return<Error> ComposerClient::destroyLayer(Display display, Layer layer) {
 Return<void> ComposerClient::getActiveConfig(Display display,
                              IComposerClient::getActiveConfig_cb hidl_cb) {
     Config config = 0;
-    Error err = (0 == display) ? Error::NONE : Error::BAD_DISPLAY;
+    Error err = (0 == display || 1 == display)
+            ? Error::NONE : Error::BAD_DISPLAY;
     hidl_cb(err, config);
     return Void();
 }
@@ -156,7 +157,7 @@ Return<void> ComposerClient::getColorModes(Display display,
                            IComposerClient::getColorModes_cb hidl_cb) {
     hidl_vec<ColorMode> modes;
     Error err = Error::BAD_DISPLAY;
-    if (0 == display) {
+    if (0 == display || 1 == display) {
         modes.resize(1);
         modes.data()[0]=ColorMode::NATIVE;
         err = Error::NONE;
@@ -178,7 +179,7 @@ Return<void> ComposerClient::getDisplayConfigs(Display display,
                                IComposerClient::getDisplayConfigs_cb hidl_cb) {
     hidl_vec<Config> configs;
     Error err = Error::BAD_DISPLAY;
-    if (0 == display) {
+    if (0 == display || 1 == display) {
         configs.resize(1);
         configs.data()[0]=0;
         err = Error::NONE;
@@ -199,7 +200,7 @@ Return<void> ComposerClient::getDisplayType(Display display,
                             IComposerClient::getDisplayType_cb hidl_cb) {
     DisplayType type = DisplayType::INVALID;
     Error err = Error::BAD_DISPLAY;
-    if (0 == display) {
+    if (0 == display || 1 == display) {
         type = DisplayType::PHYSICAL;
         err = Error::NONE;
     }

@@ -46,7 +46,7 @@ Hwc2Device::Hwc2Device()
 }
 
 int32_t Hwc2Device::createLayer(hwc2_display_t displayId, hwc2_layer_t* outLayerId) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     *outLayerId = addLayer();
@@ -55,7 +55,7 @@ int32_t Hwc2Device::createLayer(hwc2_display_t displayId, hwc2_layer_t* outLayer
 }
 
 int32_t Hwc2Device::destroyLayer(hwc2_display_t displayId, hwc2_layer_t layerId) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (removeLayer(layerId)) {
@@ -68,7 +68,7 @@ int32_t Hwc2Device::destroyLayer(hwc2_display_t displayId, hwc2_layer_t layerId)
 
 int32_t Hwc2Device::getClientTargetSupport(hwc2_display_t displayId, uint32_t width, uint32_t height,
                                       int32_t format, int32_t dataspace) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (dataspace != HAL_DATASPACE_UNKNOWN) {
@@ -83,7 +83,7 @@ int32_t Hwc2Device::getClientTargetSupport(hwc2_display_t displayId, uint32_t wi
 
 int32_t Hwc2Device::getDisplayAttribute(hwc2_display_t displayId, hwc2_config_t config,
         int32_t intAttribute, int32_t* outValue) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (0 != config) {
@@ -113,7 +113,7 @@ int32_t Hwc2Device::getDisplayAttribute(hwc2_display_t displayId, hwc2_config_t 
 }
 
 int32_t Hwc2Device::getDisplayName(hwc2_display_t displayId, uint32_t* outSize, char* outName) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     const auto& info = mFbInfo;
@@ -126,7 +126,7 @@ int32_t Hwc2Device::getDisplayName(hwc2_display_t displayId, uint32_t* outSize, 
 }
 
 int32_t Hwc2Device::setVsyncEnabled(hwc2_display_t displayId, int32_t intEnabled) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     mVsyncThread.enableCallback(intEnabled == HWC2_VSYNC_ENABLE);
@@ -141,7 +141,7 @@ int32_t Hwc2Device::setClientTarget(hwc2_display_t displayId, buffer_handle_t ta
         sync_wait(acquireFence, -1);
         close(acquireFence);
     }
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (dataspace != HAL_DATASPACE_UNKNOWN) {
@@ -153,7 +153,7 @@ int32_t Hwc2Device::setClientTarget(hwc2_display_t displayId, buffer_handle_t ta
 
 int32_t Hwc2Device::validateDisplay(hwc2_display_t displayId, uint32_t* outNumTypes,
         uint32_t* outNumRequests) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     const auto& dirtyLayers = getDirtyLayers();
@@ -170,20 +170,20 @@ int32_t Hwc2Device::validateDisplay(hwc2_display_t displayId, uint32_t* outNumTy
 }
 
 int32_t Hwc2Device::presentDisplay(hwc2_display_t displayId, int32_t* outRetireFence) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (getState() != State::VALIDATED) {
         return HWC2_ERROR_NOT_VALIDATED;
     }
     ALOGV("presentDisplay(%p)", mBuffer);
-    mHwcContext->hwc_post(mBuffer);
+    mHwcContext->hwc_post(displayId, mBuffer);
     *outRetireFence = -1;
     return HWC2_ERROR_NONE;
 }
 
 int32_t Hwc2Device::acceptDisplayChanges(hwc2_display_t displayId) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (getState() == State::MODIFIED) {
@@ -196,7 +196,7 @@ int32_t Hwc2Device::acceptDisplayChanges(hwc2_display_t displayId) {
 
 int32_t Hwc2Device::getChangedCompositionTypes(hwc2_display_t displayId, uint32_t* outNumElements,
         hwc2_layer_t* outLayers, int32_t* outTypes){
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (getState() == State::MODIFIED) {
@@ -218,7 +218,7 @@ int32_t Hwc2Device::getChangedCompositionTypes(hwc2_display_t displayId, uint32_
 
 int32_t Hwc2Device::setLayerCompositionType(hwc2_display_t displayId, hwc2_layer_t layerId,
         int32_t intType) {
-    if (0 != displayId) {
+    if (0 != displayId && 1 != displayId ) {
         return HWC2_ERROR_BAD_DISPLAY;
     }
     if (!markLayerDirty(layerId, intType != HWC2_COMPOSITION_CLIENT)) {
@@ -248,6 +248,10 @@ int32_t Hwc2Device::registerCallback(int32_t intDesc, hwc2_callback_data_t callb
         case HWC2_CALLBACK_HOTPLUG:
             if (pointer) {
                 reinterpret_cast<HWC2_PFN_HOTPLUG>(pointer)(callbackData, 0,
+                                                            HWC2_CONNECTION_CONNECTED);
+
+                if (mHwcContext->is_display2_active())
+                    reinterpret_cast<HWC2_PFN_HOTPLUG>(pointer)(callbackData, 1,
                                                             HWC2_CONNECTION_CONNECTED);
             }
             break;
