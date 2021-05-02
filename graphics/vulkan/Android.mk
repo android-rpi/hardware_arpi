@@ -13,6 +13,7 @@ LOCAL_LDFLAGS += -Wl,--build-id=sha1
 LOCAL_C_INCLUDES := \
     external/mesa3d/include \
     external/mesa3d/prebuilt-intermediates/v3dv \
+    frameworks/native/libs/arect/include \
     frameworks/native/vulkan/include
 
 LOCAL_STATIC_LIBRARIES := \
@@ -29,12 +30,15 @@ LOCAL_WHOLE_STATIC_LIBRARIES := \
     libmesa_vulkan_broadcom
 
 LOCAL_SHARED_LIBRARIES += \
+    libcutils \
     libsync \
     libdrm \
     liblog \
     libz
 
 LOCAL_HEADER_LIBRARIES += \
-    libhardware_headers 
+    libhardware_headers \
+    libnativewindow_headers \
+    libnativebase_headers
 
 include $(BUILD_SHARED_LIBRARY)
