@@ -22,11 +22,11 @@ LOCAL_STATIC_LIBRARIES := \
     libmesa_glsl \
     libmesa_nir \
     libmesa_util \
-    libmesa_vulkan_util \
     libmesa_broadcom_genxml \
     libmesa_broadcom_cle
 
 LOCAL_WHOLE_STATIC_LIBRARIES := \
+    libmesa_vulkan_util \
     libmesa_vulkan_broadcom
 
 LOCAL_SHARED_LIBRARIES += \
