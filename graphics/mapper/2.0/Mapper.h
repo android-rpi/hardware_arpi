@@ -33,6 +33,7 @@ using mapper::V2_0::passthrough::grallocEncodeBufferDescriptor;
 class Mapper : public IMapper {
   public:
     Mapper();
+    ~Mapper();
 
     Return<void> createDescriptor(const IMapper::BufferDescriptorInfo& descriptorInfo,
         createDescriptor_cb hidl_cb) override;
@@ -51,7 +52,7 @@ class Mapper : public IMapper {
     Return<void> unlock(void* buffer, IMapper::unlock_cb hidl_cb) override;
 
   private:
-    struct drm_module_t* mModule;
+    struct gbm_module_t* mModule;
 };
 
 extern "C" IMapper* HIDL_FETCH_IMapper(const char* name);

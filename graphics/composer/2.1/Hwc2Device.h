@@ -32,8 +32,6 @@
 #include <thread>
 #include <unordered_set>
 
-#include <gralloc_drm.h>
-#include <gralloc_drm_priv.h>
 #include "hwc_context.h"
 
 namespace android {

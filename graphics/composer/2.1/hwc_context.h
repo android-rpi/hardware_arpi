@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Android-RPi Project
+ * Copyright 2020-2022 Android-RPi Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,28 @@
 
 #pragma once
 
+#include <xf86drm.h>
 #include <xf86drmMode.h>
-#include <gralloc_drm_priv.h>
+
+#include <android/gralloc_handle.h>
+
+#define fb_id(handle) ((uint32_t)(handle->reserved))
+#define fb_id_ptr(handle) ((uint32_t *)&(handle->reserved))
+
+static inline struct gralloc_handle_t *gralloc_check_handle(buffer_handle_t _handle)
+{
+	struct gralloc_handle_t *handle = gralloc_handle(_handle);
+	if (handle && (handle->version != GRALLOC_HANDLE_VERSION ||
+	               handle->base.numInts != GRALLOC_HANDLE_NUM_INTS ||
+	               handle->base.numFds != GRALLOC_HANDLE_NUM_FDS ||
+	               handle->magic != GRALLOC_HANDLE_MAGIC)) {
+		ALOGE("invalid handle: version=%d, numInts=%d, numFds=%d, magic=%x",
+			handle->version, handle->base.numInts,
+			handle->base.numFds, handle->magic);
+		handle = NULL;
+	}
+	return handle;
+}
 
 namespace android {
 
@@ -57,12 +77,12 @@ class hwc_context {
     int init_with_connector(struct kms_output *output,
     		drmModeConnectorPtr connector);
     void init_features();
-    int bo_post(struct gralloc_drm_bo_t *bo);
-    int bo_post2(struct gralloc_drm_bo_t *bo);
+    int bo_post(struct gralloc_handle_t *bo);
+    int bo_post2(struct gralloc_handle_t *bo);
     void wait_for_post(int flip);
     void wait_for_post2(int flip);
     int set_crtc(struct kms_output *output, int fb_id);
-    int bo_add_fb(struct gralloc_drm_bo_t *bo);
+    int bo_add_fb(struct gralloc_handle_t *bo);
 
 	int kms_fd;
 	drmModeResPtr resources;
@@ -76,11 +96,11 @@ class hwc_context {
 	unsigned int last_swap, last_swap2;
 
   public:
-    int page_flip(struct gralloc_drm_bo_t *bo);
-    int page_flip2(struct gralloc_drm_bo_t *bo);
+    int page_flip(struct gralloc_handle_t *bo);
+    int page_flip2(struct gralloc_handle_t *bo);
     int waiting_flip, waiting_flip2;
-    struct gralloc_drm_bo_t *current_front, *next_front;
-    struct gralloc_drm_bo_t *current_front2, *next_front2;
+    struct gralloc_handle_t *current_front, *next_front;
+    struct gralloc_handle_t *current_front2, *next_front2;
 };
 
 } // namespace android

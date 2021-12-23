@@ -1,0 +1,27 @@
+cc_library_shared {
+    name: "gralloc.rpi4",
+    vendor: true,
+    proprietary: true,
+    relative_install_path: "hw",
+    shared_libs: [
+        "libhardware",
+        "libutils",
+        "libcutils",
+        "liblog",
+        "libdrm",
+    ],
+    static_libs: [
+        "libgbm_mesa",
+        "libgbm_gralloc",
+    ],
+    header_libs: [
+        "libdrm_headers",
+    ],
+    srcs: [
+        "gralloc_rpi.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}

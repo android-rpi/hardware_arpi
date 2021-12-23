@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2010-2011 Chia-I Wu <olvaffe@gmail.com>
  * Copyright (C) 2010-2011 LunarG Inc.
- * Copyright (C) 2020 Android-RPi Project
+ * Copyright (C) 2016 Linaro, Ltd., Rob Herring <robh@kernel.org>
+ * Copyright (C) 2022 Android-RPi Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,47 +23,28 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#define LOG_TAG "allocator@2.0-drm_gralloc_v3d"
-//#define LOG_NDEBUG 0
-#include <utils/Log.h>
-#include <sys/errno.h>
-#include <drm_fourcc.h>
-#include "drm_gralloc_v3d.h"
+#pragma once
 
-int drm_init(struct drm_module_t *mod) {
-	int err = 0;
-	if (!mod->drm) {
-		mod->drm = gralloc_drm_create();
-		if (!mod->drm)
-			err = -EINVAL;
-	}
-	return err;
-}
+#include <cutils/native_handle.h>
 
-void drm_deinit(struct drm_module_t *mod) {
-	gralloc_drm_destroy(mod->drm);
-	mod->drm = NULL;
-}
+struct gbm_device;
+struct gbm_bo;
 
-int drm_alloc(const struct drm_module_t *mod, int w, int h, int format, int usage,
-		buffer_handle_t *handle, int *stride) {
-	struct gralloc_drm_bo_t *bo;
-	int bpp = gralloc_drm_get_bpp(format);
-	if (!bpp) return -EINVAL;
-	bo = gralloc_drm_bo_create(mod->drm, w, h, format, usage);
-	if (!bo) return -ENOMEM;
-	*handle = gralloc_drm_bo_get_handle(bo, stride);
-	/* in pixels */
-	*stride /= bpp;
-	return 0;
-}
+int gralloc_gbm_get_bpp(int format);
 
-int drm_free(buffer_handle_t handle) {
-	struct gralloc_drm_bo_t *bo;
-	bo = gralloc_drm_bo_from_handle(handle);
-	if (!bo)
-		return -EINVAL;
-	gralloc_drm_bo_decref(bo);
-	return 0;
-}
+int gralloc_gbm_handle_register(buffer_handle_t handle, struct gbm_device *gbm);
+int gralloc_gbm_handle_unregister(buffer_handle_t handle);
 
+buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
+		int width, int height, int format, int usage, int *stride);
+void gbm_free(buffer_handle_t handle);
+
+struct gbm_bo *gralloc_gbm_bo_from_handle(buffer_handle_t handle);
+
+int gralloc_gbm_bo_lock(buffer_handle_t handle, int usage, int x, int y, int w, int h, void **addr);
+int gralloc_gbm_bo_unlock(buffer_handle_t handle);
+int gralloc_gbm_bo_lock_ycbcr(buffer_handle_t handle, int usage,
+		int x, int y, int w, int h, struct android_ycbcr *ycbcr);
+
+struct gbm_device *gbm_dev_create(void);
+void gbm_dev_destroy(struct gbm_device *gbm);

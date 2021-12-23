@@ -1,76 +1,58 @@
-#include <string>
+/*
+ * Copyright 2016-2022 Android-RPi Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#define LOG_TAG "gralloc.rpi4"
+//#define LOG_NDEBUG 0
+#include <utils/Log.h>
 #include <sys/errno.h>
-#include <gralloc_drm.h>
-#include <gralloc_drm_priv.h>
+#include <pthread.h>
+#include <gbm_module.h>
 
-int drm_init(struct drm_module_t const* cmod) {
-	struct drm_module_t *mod = (struct drm_module_t *) cmod;
-	int err = 0;
-	pthread_mutex_lock(&mod->mutex);
-	if (!mod->drm) {
-		mod->drm = gralloc_drm_create();
-		if (!mod->drm)
-			err = -EINVAL;
-	}
-	pthread_mutex_unlock(&mod->mutex);
-	return err;
-}
+static buffer_handle_t rhandle = NULL;
 
-static int drm_mod_perform(struct gralloc_module_t const* mod, int op, ...)
-{
-	struct drm_module_t *dmod = (struct drm_module_t *) mod;
-	va_list args;
-	int err;
-
-	err = drm_init(dmod);
-	if (err)
-		return err;
-
-	va_start(args, op);
-	switch (op) {
-	case GRALLOC_MODULE_PERFORM_GET_DRM_FD:
-		{
-			int *fd = va_arg(args, int *);
-			*fd = gralloc_drm_get_fd(dmod->drm);
-			err = 0;
-		}
-		break;
-	default:
-		err = -EINVAL;
-		break;
-	}
-	va_end(args);
-
-	return err;
-}
-
-static int drm_mod_lock_ycbcr(struct gralloc_module_t const* /*mod*/,
+static int lock_ycbcr(struct gralloc_module_t const* mod,
 		buffer_handle_t handle, int usage,
-		int x, int y, int w, int h, struct android_ycbcr *ycbcr)
-{
-	int ret = 0;
-	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
-	if (!bo) {
-		ret = -EINVAL;
-	} else {
-	    ret = gralloc_drm_bo_lock_ycbcr(bo, usage, x, y, w, h, ycbcr);
-	}
-	return ret;
+		int x, int y, int w, int h, struct android_ycbcr *ycbcr) {
+    struct gbm_module_t *gmod = (struct gbm_module_t *)mod;
+
+    if (gbm_mod_register(gmod, handle) == 0) {
+        ALOGV("lock_ycbcr() register handle %p", handle);
+        rhandle = handle;
+    }
+
+    return gbm_mod_lock_ycbcr(gmod, handle, usage, x, y, w, h, ycbcr);
 }
 
-static int drm_mod_unlock(struct gralloc_module_t const* /*mod*/, buffer_handle_t handle)
-{
-	int ret = 0;
-	struct gralloc_drm_bo_t *bo = gralloc_drm_bo_from_handle(handle);
-	if (!bo) {
-		ret = -EINVAL;
-	} else {
-		gralloc_drm_bo_unlock(bo);
-	}
-	return ret;
+static int unlock(struct gralloc_module_t const* mod, buffer_handle_t handle) {
+    struct gbm_module_t *gmod = (struct gbm_module_t *)mod;
+    if (!gmod->gbm) return -EINVAL;
+
+    int ret = gbm_mod_unlock(gmod, handle);
+    if (ret) return ret;
+
+    if (rhandle == handle) {
+        ALOGV("unlock() unregister handle %p", handle);
+        gbm_mod_unregister(gmod, handle);
+	rhandle = NULL;
+    }
+
+    return 0;
 }
 
-struct drm_module_t HAL_MODULE_INFO_SYM = {
+struct gbm_module_t HAL_MODULE_INFO_SYM = {
 	.base = {
 		.common = {
 			.tag = HARDWARE_MODULE_TAG,
@@ -80,10 +62,9 @@ struct drm_module_t HAL_MODULE_INFO_SYM = {
 			.name = "arpi gralloc",
 			.author = "Android-RPi",
 		},
-		.lock_ycbcr = drm_mod_lock_ycbcr,
-		.perform = drm_mod_perform,
-		.unlock = drm_mod_unlock,
+		.lock_ycbcr = lock_ycbcr,
+		.unlock = unlock,
 	},
 	.mutex = PTHREAD_MUTEX_INITIALIZER,
-	.drm = NULL
+	.gbm = NULL
 };

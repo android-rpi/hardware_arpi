@@ -21,7 +21,7 @@
 #include <grallocusage/GrallocUsageConversion.h>
 
 #include <hardware/gralloc1.h>
-#include "drm_gralloc_v3d.h"
+#include "gbm_module.h"
 #include "Allocator.h"
 
 namespace android {
@@ -33,20 +33,19 @@ namespace implementation {
 
 Allocator::Allocator() {
     ALOGV("Constructing");
-    mModule = new drm_module_t;
-    mModule->drm = nullptr;
-    int error = drm_init(mModule);
+    mModule = new gbm_module_t;
+    mModule->gbm = nullptr;
+    int error = gbm_mod_init(mModule);
     if (error) {
-        ALOGE("Failed drm_init() %d", error);
+        ALOGE("Failed Allocator()) %d", error);
     }
 }
 
 Allocator::~Allocator() {
 	ALOGV("Destructing");
     if (mModule != nullptr) {
-        drm_deinit(mModule);
+        gbm_mod_deinit(mModule);
         delete mModule;
-        mModule = nullptr;
     }
 }
 
@@ -115,11 +114,11 @@ Error Allocator::allocateOneBuffer(
 
     ALOGV("Calling alloc(%u, %u, %i, %u)", descInfo.width,
             descInfo.height, descInfo.format, usage);
-    auto error = drm_alloc(mModule, static_cast<int>(descInfo.width),
+    auto error = gbm_mod_alloc(mModule, static_cast<int>(descInfo.width),
             static_cast<int>(descInfo.height), static_cast<int>(descInfo.format),
             usage, &handle, &stride);
     if (error != 0) {
-        ALOGE("gralloc0 allocation failed: %d (%s)", error, strerror(-error));
+        ALOGE("gbm_mod_alloc() failed: %d (%s)", error, strerror(-error));
         return Error::NO_RESOURCES;
     }
     *outBufferHandle = handle;
@@ -172,9 +171,9 @@ Return<void> Allocator::allocate(const BufferDescriptor& descriptor,
 
 void Allocator::freeBuffers(const std::vector<const native_handle_t*>& buffers) {
     for (auto buffer : buffers) {
-    	int result = drm_free(buffer);
+    	int result = gbm_mod_free(mModule, buffer);
     	if (result != 0) {
-    		ALOGE("drm_free () failed: %d", result);
+    		ALOGE("gbm_mod_free() failed: %d", result);
     	}
     }
 }

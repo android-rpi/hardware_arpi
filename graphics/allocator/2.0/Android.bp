@@ -1,0 +1,34 @@
+cc_binary {
+    name: "android.hardware.graphics.allocator@2.0-service.rpi4",
+    vendor: true,
+    proprietary: true,
+    relative_install_path: "hw",
+    init_rc: ["android.hardware.graphics.allocator@2.0-service.rpi4.rc"],
+    shared_libs: [
+        "android.hardware.graphics.allocator@2.0",
+        "libhidlbase",
+        "libbase",
+        "libutils",
+        "libcutils",
+        "liblog",
+        "libgrallocusage",
+        "libdrm",
+    ],
+    static_libs: [
+        "libgbm_mesa",
+        "libgbm_gralloc",
+    ],
+    header_libs: [
+        "android.hardware.graphics.mapper@2.0-passthrough_headers",
+        "libhardware_headers",
+        "libdrm_headers",
+    ],
+    srcs: [
+        "Allocator.cpp",
+        "service.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}
