@@ -81,6 +81,7 @@ static uint32_t get_gbm_format(int format)
 		break;
 	case HAL_PIXEL_FORMAT_YV12:
 	case HAL_PIXEL_FORMAT_YCBCR_420_888:
+	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
 		/* YV12 is planar, but must be a single buffer so ask for GR88 */
 		fmt = GBM_FORMAT_GR88;
 		break;
@@ -113,6 +114,7 @@ int gralloc_gbm_get_bpp(int format)
 	case HAL_PIXEL_FORMAT_RGB_565:
 	case HAL_PIXEL_FORMAT_YCbCr_422_I:
 	case HAL_PIXEL_FORMAT_YCBCR_420_888:
+	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
 		bpp = 2;
 		break;
 	/* planar; only Y is considered */
@@ -483,6 +485,7 @@ int gralloc_gbm_bo_lock_ycbcr(buffer_handle_t handle,
 
 	switch (hnd->format) {
 	case HAL_PIXEL_FORMAT_YCbCr_420_888:
+	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
 		ystride = cstride = GRALLOC_ALIGN(hnd->width, 16);
 		ycbcr->y = addr;
 		ycbcr->cb = (unsigned char *)addr + ystride * hnd->height;
