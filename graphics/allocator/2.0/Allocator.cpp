@@ -18,7 +18,6 @@
 //#define LOG_NDEBUG 0
 #include <android-base/logging.h>
 #include <utils/Log.h>
-#include <grallocusage/GrallocUsageConversion.h>
 
 #include <hardware/gralloc1.h>
 #include "gbm_module.h"
@@ -107,12 +106,11 @@ Error Allocator::allocateOneBuffer(
 		const IMapper::BufferDescriptorInfo& descInfo,
         buffer_handle_t* outBufferHandle, uint32_t* outStride)
 {
-    int usage = android_convertGralloc1To0Usage(
-    		toProducerUsage(descInfo.usage), toConsumerUsage(descInfo.usage));
+    uint64_t usage = toProducerUsage(descInfo.usage) | toConsumerUsage(descInfo.usage);
     buffer_handle_t handle = nullptr;
     int stride = 0;
 
-    ALOGV("Calling alloc(%u, %u, %i, %u)", descInfo.width,
+    ALOGV("Calling alloc(%u, %u, %i, %lx)", descInfo.width,
             descInfo.height, descInfo.format, usage);
     auto error = gbm_mod_alloc(mModule, static_cast<int>(descInfo.width),
             static_cast<int>(descInfo.height), static_cast<int>(descInfo.format),

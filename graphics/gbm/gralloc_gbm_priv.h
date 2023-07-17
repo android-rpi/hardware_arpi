@@ -36,14 +36,14 @@ int gralloc_gbm_handle_register(buffer_handle_t handle, struct gbm_device *gbm);
 int gralloc_gbm_handle_unregister(buffer_handle_t handle);
 
 buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
-		int width, int height, int format, int usage, int *stride);
+		int width, int height, int format, uint64_t usage, int *stride);
 void gbm_free(buffer_handle_t handle);
 
 struct gbm_bo *gralloc_gbm_bo_from_handle(buffer_handle_t handle);
 
-int gralloc_gbm_bo_lock(buffer_handle_t handle, int usage, int x, int y, int w, int h, void **addr);
+int gralloc_gbm_bo_lock(buffer_handle_t handle, uint64_t usage, int x, int y, int w, int h, void **addr);
 int gralloc_gbm_bo_unlock(buffer_handle_t handle);
-int gralloc_gbm_bo_lock_ycbcr(buffer_handle_t handle, int usage,
+int gralloc_gbm_bo_lock_ycbcr(buffer_handle_t handle, uint64_t usage,
 		int x, int y, int w, int h, struct android_ycbcr *ycbcr);
 
 struct gbm_device *gbm_dev_create(void);

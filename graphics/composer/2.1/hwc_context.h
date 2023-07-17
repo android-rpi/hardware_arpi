@@ -19,18 +19,15 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#include <android/gralloc_handle.h>
+#include <gralloc1_handle.h>
 
-#define fb_id(handle) ((uint32_t)(handle->reserved))
-#define fb_id_ptr(handle) ((uint32_t *)&(handle->reserved))
-
-static inline struct gralloc_handle_t *gralloc_check_handle(buffer_handle_t _handle)
+static inline struct gralloc1_handle_t *gralloc_check_handle(buffer_handle_t _handle)
 {
-	struct gralloc_handle_t *handle = gralloc_handle(_handle);
-	if (handle && (handle->version != GRALLOC_HANDLE_VERSION ||
-	               handle->base.numInts != GRALLOC_HANDLE_NUM_INTS ||
-	               handle->base.numFds != GRALLOC_HANDLE_NUM_FDS ||
-	               handle->magic != GRALLOC_HANDLE_MAGIC)) {
+	struct gralloc1_handle_t *handle = gralloc1_handle(_handle);
+	if (handle && (handle->version != GRALLOC1_HANDLE_VERSION ||
+	               handle->base.numInts != GRALLOC1_HANDLE_NUM_INTS ||
+	               handle->base.numFds != GRALLOC1_HANDLE_NUM_FDS ||
+	               handle->magic != GRALLOC1_HANDLE_MAGIC)) {
 		ALOGE("invalid handle: version=%d, numInts=%d, numFds=%d, magic=%x",
 			handle->version, handle->base.numInts,
 			handle->base.numFds, handle->magic);
@@ -48,7 +45,7 @@ struct kms_output
 	uint32_t pipe;
 	drmModeModeInfo mode;
 	int xdpi, ydpi;
-	int fb_format;
+	uint32_t drm_format;
 	int bpp;
 	uint32_t active;
 };
@@ -77,12 +74,12 @@ class hwc_context {
     int init_with_connector(struct kms_output *output,
     		drmModeConnectorPtr connector);
     void init_features();
-    int bo_post(struct gralloc_handle_t *bo);
-    int bo_post2(struct gralloc_handle_t *bo);
+    int bo_post(struct gralloc1_handle_t *bo);
+    int bo_post2(struct gralloc1_handle_t *bo);
     void wait_for_post(int flip);
     void wait_for_post2(int flip);
-    int set_crtc(struct kms_output *output, int fb_id);
-    int bo_add_fb(struct gralloc_handle_t *bo);
+    int set_crtc(struct kms_output *output, uint32_t fb_id);
+    int bo_add_fb(struct gralloc1_handle_t *bo);
 
 	int kms_fd;
 	drmModeResPtr resources;
@@ -96,11 +93,11 @@ class hwc_context {
 	unsigned int last_swap, last_swap2;
 
   public:
-    int page_flip(struct gralloc_handle_t *bo);
-    int page_flip2(struct gralloc_handle_t *bo);
+    int page_flip(struct gralloc1_handle_t *bo);
+    int page_flip2(struct gralloc1_handle_t *bo);
     int waiting_flip, waiting_flip2;
-    struct gralloc_handle_t *current_front, *next_front;
-    struct gralloc_handle_t *current_front2, *next_front2;
+    struct gralloc1_handle_t *current_front, *next_front;
+    struct gralloc1_handle_t *current_front2, *next_front2;
 };
 
 } // namespace android

@@ -43,37 +43,22 @@
 
 namespace android {
 
-static unsigned int drm_format_from_hal(int hal_format)
-{
-	switch(hal_format) {
-		case HAL_PIXEL_FORMAT_RGB_888:
-		case HAL_PIXEL_FORMAT_BGRA_8888:
-			return DRM_FORMAT_XRGB8888;
-		case HAL_PIXEL_FORMAT_RGBX_8888:
-			return DRM_FORMAT_XBGR8888;
-		case HAL_PIXEL_FORMAT_RGBA_8888:
-			return DRM_FORMAT_RGBA8888;
-		case HAL_PIXEL_FORMAT_RGB_565:
-			return DRM_FORMAT_RGB565;
-		case HAL_PIXEL_FORMAT_YV12:
-			return DRM_FORMAT_YUV420;
-		default:
-			return 0;
-	}
-}
-
 /*
  * Add a fb object for a bo.
  */
-int hwc_context::bo_add_fb(struct gralloc_handle_t *bo)
+int hwc_context::bo_add_fb(struct gralloc1_handle_t *bo)
 {
-	if (fb_id(bo))
+	if (bo->fb_id)
 		return 0;
 
 	uint32_t pitches[4] = { 0, 0, 0, 0 };
 	uint32_t offsets[4] = { 0, 0, 0, 0 };
 	uint32_t handles[4] = { 0, 0, 0, 0 };
 	uint64_t modifiers[4] = { 0, 0, 0, 0 };
+
+        uint32_t width = (uint32_t)primary_output.mode.hdisplay;
+        uint32_t height = (uint32_t)primary_output.mode.vdisplay;
+        uint32_t drm_format = primary_output.drm_format;
 
 	uint32_t handle;
 	int ret = drmPrimeFDToHandle(kms_fd, bo->prime_fd, &handle);
@@ -86,26 +71,19 @@ int hwc_context::bo_add_fb(struct gralloc_handle_t *bo)
 	handles[0] = handle;
 	modifiers[0] = DRM_FORMAT_MOD_LINEAR;
 
-	int drm_format = drm_format_from_hal(bo->format);
-
-	if (drm_format == 0) {
-		ALOGE("error resolving drm format");
-		return -EINVAL;
-	}
-
 	ALOGV("bo_add_fb() width:%d height:%d format:%x handle:%d pitch:%d",
-			bo->width, bo->height,
+			width, height,
 					drm_format, handle, pitches[0]);
 	return drmModeAddFB2WithModifiers(kms_fd,
-		bo->width, bo->height,
+		width, height,
 		drm_format, handles, pitches, offsets, modifiers,
-		(uint32_t *) fb_id_ptr(bo), DRM_MODE_FB_MODIFIERS);
+                &bo->fb_id, DRM_MODE_FB_MODIFIERS);
 }
 
 /*
  * Program CRTC.
  */
-int hwc_context::set_crtc(struct kms_output *output, int fb_id)
+int hwc_context::set_crtc(struct kms_output *output, uint32_t fb_id)
 {
 	int ret;
 
@@ -149,7 +127,7 @@ static void page_flip_handler2(int /*fd*/, unsigned int /*sequence*/,
 /*
  * Schedule a page flip.
  */
-int hwc_context::page_flip(struct gralloc_handle_t *bo)
+int hwc_context::page_flip(struct gralloc1_handle_t *bo)
 {
 	int ret;
 
@@ -169,11 +147,11 @@ int hwc_context::page_flip(struct gralloc_handle_t *bo)
 	if (!bo)
 		return 0;
 
-	ret = drmModePageFlip(kms_fd, primary_output.crtc_id, fb_id(bo),
+	ret = drmModePageFlip(kms_fd, primary_output.crtc_id, bo->fb_id,
 			DRM_MODE_PAGE_FLIP_EVENT, (void *) this);
 	if (ret) {
 		ALOGE("failed to perform page flip for primary (%s) (crtc %d fb %d))",
-			strerror(errno), primary_output.crtc_id, fb_id(bo));
+			strerror(errno), primary_output.crtc_id, bo->fb_id);
 		/* try to set mode for next frame */
 		if (errno != EBUSY)
 			first_post = 1;
@@ -184,7 +162,7 @@ int hwc_context::page_flip(struct gralloc_handle_t *bo)
 	return ret;
 }
 
-int hwc_context::page_flip2(struct gralloc_handle_t *bo)
+int hwc_context::page_flip2(struct gralloc1_handle_t *bo)
 {
 	int ret;
 
@@ -204,11 +182,11 @@ int hwc_context::page_flip2(struct gralloc_handle_t *bo)
 	if (!bo)
 		return 0;
 
-	ret = drmModePageFlip(kms_fd, secondary_output.crtc_id, fb_id(bo),
+	ret = drmModePageFlip(kms_fd, secondary_output.crtc_id, bo->fb_id,
 			DRM_MODE_PAGE_FLIP_EVENT, (void *) this);
 	if (ret) {
 		ALOGE("failed to perform page flip for primary (%s) (crtc %d fb %d))",
-			strerror(errno), secondary_output.crtc_id, fb_id(bo));
+			strerror(errno), secondary_output.crtc_id, bo->fb_id);
 		/* try to set mode for next frame */
 		if (errno != EBUSY)
 			first_post2 = 1;
@@ -321,11 +299,11 @@ void hwc_context::wait_for_post2(int flip)
 /*
  * Post a bo.  This is not thread-safe.
  */
-int hwc_context::bo_post(struct gralloc_handle_t *bo)
+int hwc_context::bo_post(struct gralloc1_handle_t *bo)
 {
 	int ret;
 
-	if (!fb_id(bo)) {
+	if (!bo->fb_id) {
 		int err = bo_add_fb(bo);
 		if (err) {
 			ALOGE("%s: could not create drm fb, (%s)",
@@ -338,7 +316,7 @@ int hwc_context::bo_post(struct gralloc_handle_t *bo)
 	/* TODO spawn a thread to avoid waiting and race */
 
 	if (first_post) {
-		ret = set_crtc(&primary_output, fb_id(bo));
+		ret = set_crtc(&primary_output, bo->fb_id);
 		if (!ret) {
 			first_post = 0;
 			current_front = bo;
@@ -362,11 +340,11 @@ int hwc_context::bo_post(struct gralloc_handle_t *bo)
 	return ret;
 }
 
-int hwc_context::bo_post2(struct gralloc_handle_t *bo)
+int hwc_context::bo_post2(struct gralloc1_handle_t *bo)
 {
 	int ret;
 
-	if (!fb_id(bo)) {
+	if (!bo->fb_id) {
 		int err = bo_add_fb(bo);
 		if (err) {
 			ALOGE("%s: could not create drm fb, (%s)",
@@ -379,7 +357,7 @@ int hwc_context::bo_post2(struct gralloc_handle_t *bo)
 	/* TODO spawn a thread to avoid waiting and race */
 
 	if (first_post2) {
-		ret = set_crtc(&secondary_output, fb_id(bo));
+		ret = set_crtc(&secondary_output, bo->fb_id);
 		if (!ret) {
 			first_post2 = 0;
 			current_front2 = bo;
@@ -431,15 +409,6 @@ static void on_signal(int /*sig*/)
 
 void hwc_context::init_features()
 {
-	switch (primary_output.fb_format) {
-	case HAL_PIXEL_FORMAT_RGBA_8888:
-	case HAL_PIXEL_FORMAT_RGB_565:
-		break;
-	default:
-		primary_output.fb_format = HAL_PIXEL_FORMAT_RGBA_8888;
-		break;
-	}
-
 	swap_interval = 1;
 
 	struct sigaction act;
@@ -696,7 +665,7 @@ int hwc_context::init_with_connector(struct kms_output *output,
 	ALOGI("the best mode is %s", mode->name);
 
 	output->mode = *mode;
-	output->fb_format = HAL_PIXEL_FORMAT_RGBA_8888;
+	output->drm_format = DRM_FORMAT_ABGR8888;
 
 	if (connector->mmWidth && connector->mmHeight) {
 		output->xdpi = (output->mode.hdisplay * 25.4 / connector->mmWidth);
@@ -848,7 +817,7 @@ hwc_context::hwc_context() {
    	        width = (uint32_t)primary_output.mode.hdisplay;
    	        height = (uint32_t)primary_output.mode.vdisplay;
    	        fps = (float)primary_output.mode.vrefresh;
-   	        format = primary_output.fb_format;
+                format = HAL_PIXEL_FORMAT_RGBA_8888;
    	        xdpi = (float)primary_output.xdpi;
    	        ydpi = (float)primary_output.ydpi;
    	    }
@@ -859,13 +828,13 @@ hwc_context::hwc_context() {
 
 int hwc_context::hwc_post(hwc2_display_t display_id, buffer_handle_t handle)
 {
-	struct gralloc_handle_t *bo = (struct gralloc_handle_t *)gralloc_check_handle(handle);
+	struct gralloc1_handle_t *bo = (struct gralloc1_handle_t *)gralloc_check_handle(handle);
 
 	if (!bo)
 		return -EINVAL;
 
 	ALOGV("hwc_post() prime_fd %d, fb_id %d",
-			bo->prime_fd, fb_id(bo));
+			bo->prime_fd, bo->fb_id);
 
     if (display_id == 0) {
         return bo_post(bo);

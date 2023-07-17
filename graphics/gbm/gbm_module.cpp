@@ -38,7 +38,7 @@ void gbm_mod_deinit(struct gbm_module_t *mod) {
     mod->gbm = NULL;
 }
 
-int gbm_mod_alloc(struct gbm_module_t *mod, int w, int h, int format, int usage,
+int gbm_mod_alloc(struct gbm_module_t *mod, int w, int h, int format, uint64_t usage,
 		buffer_handle_t *handle, int *stride) {
 	int err = 0;
 	int bpp = gralloc_gbm_get_bpp(format);
@@ -49,7 +49,7 @@ int gbm_mod_alloc(struct gbm_module_t *mod, int w, int h, int format, int usage,
 	if (!*handle)
 		err = -errno;
 
-	ALOGV("buffer %p usage = %08x", *handle, usage);
+	ALOGV("buffer %p usage = %016lx", *handle, usage);
 	pthread_mutex_unlock(&mod->mutex);
 	return err;
 }
@@ -83,17 +83,17 @@ int gbm_mod_unregister(struct gbm_module_t *mod, buffer_handle_t handle) {
 	return err;
 }
 
-int gbm_mod_lock(struct gbm_module_t *mod, buffer_handle_t handle, int usage, int x, int y, int w, int h, void **ptr) {
+int gbm_mod_lock(struct gbm_module_t *mod, buffer_handle_t handle, uint64_t usage, int x, int y, int w, int h, void **ptr) {
 	int err;
 	pthread_mutex_lock(&mod->mutex);
 	err = gralloc_gbm_bo_lock(handle, usage, x, y, w, h, ptr);
-	ALOGV("buffer %p lock usage = %08x", handle, usage);
+	ALOGV("buffer %p lock usage = %016lx", handle, usage);
 	pthread_mutex_unlock(&mod->mutex);
 	return err;
 }
 
 int gbm_mod_lock_ycbcr(struct gbm_module_t *mod, buffer_handle_t handle,
-        int usage, int x, int y, int w, int h, struct android_ycbcr *ycbcr) {
+        uint64_t usage, int x, int y, int w, int h, struct android_ycbcr *ycbcr) {
 	int err;
 	pthread_mutex_lock(&mod->mutex);
 	err = gralloc_gbm_bo_lock_ycbcr(handle, usage, x, y, w, h, ycbcr);

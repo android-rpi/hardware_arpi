@@ -21,6 +21,38 @@
 #include <pthread.h>
 #include <gbm_module.h>
 
+#include <hardware/gralloc.h>
+#include <hardware/gralloc1.h>
+
+static void android_convertGralloc0To1Usage(int32_t usage, uint64_t* producerUsage,
+                                     uint64_t* consumerUsage) {
+    constexpr uint64_t PRODUCER_MASK =
+        GRALLOC1_PRODUCER_USAGE_CPU_READ |
+        /* GRALLOC1_PRODUCER_USAGE_CPU_READ_OFTEN | */
+        GRALLOC1_PRODUCER_USAGE_CPU_WRITE |
+        /* GRALLOC1_PRODUCER_USAGE_CPU_WRITE_OFTEN | */
+        GRALLOC1_PRODUCER_USAGE_GPU_RENDER_TARGET | GRALLOC1_PRODUCER_USAGE_PROTECTED |
+        GRALLOC1_PRODUCER_USAGE_CAMERA | GRALLOC1_PRODUCER_USAGE_VIDEO_DECODER |
+        GRALLOC1_PRODUCER_USAGE_SENSOR_DIRECT_DATA;
+    constexpr uint64_t CONSUMER_MASK =
+        GRALLOC1_CONSUMER_USAGE_CPU_READ |
+        /* GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN | */
+        GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE | GRALLOC1_CONSUMER_USAGE_HWCOMPOSER |
+        GRALLOC1_CONSUMER_USAGE_CLIENT_TARGET | GRALLOC1_CONSUMER_USAGE_CURSOR |
+        GRALLOC1_CONSUMER_USAGE_VIDEO_ENCODER | GRALLOC1_CONSUMER_USAGE_CAMERA |
+        GRALLOC1_CONSUMER_USAGE_RENDERSCRIPT | GRALLOC1_CONSUMER_USAGE_GPU_DATA_BUFFER;
+    *producerUsage = static_cast<uint64_t>(usage) & PRODUCER_MASK;
+    *consumerUsage = static_cast<uint64_t>(usage) & CONSUMER_MASK;
+    if ((static_cast<uint32_t>(usage) & GRALLOC_USAGE_SW_READ_OFTEN) == GRALLOC_USAGE_SW_READ_OFTEN) {
+        *producerUsage |= GRALLOC1_PRODUCER_USAGE_CPU_READ_OFTEN;
+        *consumerUsage |= GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN;
+    }
+    if ((static_cast<uint32_t>(usage) & GRALLOC_USAGE_SW_WRITE_OFTEN) ==
+        GRALLOC_USAGE_SW_WRITE_OFTEN) {
+        *producerUsage |= GRALLOC1_PRODUCER_USAGE_CPU_WRITE_OFTEN;
+    }
+}
+
 static buffer_handle_t rhandle = NULL;
 
 static int lock_ycbcr(struct gralloc_module_t const* mod,
@@ -33,7 +65,10 @@ static int lock_ycbcr(struct gralloc_module_t const* mod,
         rhandle = handle;
     }
 
-    return gbm_mod_lock_ycbcr(gmod, handle, usage, x, y, w, h, ycbcr);
+    uint64_t producerUsage, consumerUsage;
+    android_convertGralloc0To1Usage(usage, &producerUsage, &consumerUsage);
+
+    return gbm_mod_lock_ycbcr(gmod, handle, producerUsage|consumerUsage, x, y, w, h, ycbcr);
 }
 
 static int unlock(struct gralloc_module_t const* mod, buffer_handle_t handle) {

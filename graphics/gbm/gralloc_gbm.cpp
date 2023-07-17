@@ -29,12 +29,12 @@
 #include <cutils/properties.h>
 #include <sys/errno.h>
 
-#include <hardware/gralloc.h>
+#include <hardware/gralloc1.h>
 
 #include <gbm.h>
 
 #include "gralloc_gbm_priv.h"
-#include <android/gralloc_handle.h>
+#include "gralloc1_handle.h"
 
 #include <unordered_map>
 
@@ -69,9 +69,6 @@ static uint32_t get_gbm_format(int format)
 		break;
 	case HAL_PIXEL_FORMAT_RGBX_8888:
 		fmt = GBM_FORMAT_XBGR8888;
-		break;
-	case HAL_PIXEL_FORMAT_RGB_888:
-		fmt = GBM_FORMAT_RGB888;
 		break;
 	case HAL_PIXEL_FORMAT_RGB_565:
 		fmt = GBM_FORMAT_RGB565;
@@ -108,9 +105,6 @@ int gralloc_gbm_get_bpp(int format)
 	case HAL_PIXEL_FORMAT_BGRA_8888:
 		bpp = 4;
 		break;
-	case HAL_PIXEL_FORMAT_RGB_888:
-		bpp = 3;
-		break;
 	case HAL_PIXEL_FORMAT_RGB_565:
 	case HAL_PIXEL_FORMAT_YCbCr_422_I:
 	case HAL_PIXEL_FORMAT_YCBCR_420_888:
@@ -132,19 +126,19 @@ int gralloc_gbm_get_bpp(int format)
 	return bpp;
 }
 
-static unsigned int get_pipe_bind(int usage)
+static unsigned int get_pipe_bind(uint64_t usage)
 {
 	unsigned int bind = 0;
 
-	if (usage & (GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN))
+	if (usage & (GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN
+		     | GRALLOC1_PRODUCER_USAGE_CPU_WRITE_OFTEN))
 		bind |= GBM_BO_USE_LINEAR;
-	if (usage & GRALLOC_USAGE_CURSOR)
-		;//bind |= GBM_BO_USE_CURSOR;
-	if (usage & (GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE))
+	if (usage & (GRALLOC1_PRODUCER_USAGE_GPU_RENDER_TARGET
+		     | GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE))
 		bind |= GBM_BO_USE_RENDERING;
-	if (usage & GRALLOC_USAGE_HW_FB)
+	if (usage & GRALLOC1_CONSUMER_USAGE_CLIENT_TARGET)
 		bind |= GBM_BO_USE_SCANOUT;
-	if (usage & GRALLOC_USAGE_HW_COMPOSER)
+	if (usage & GRALLOC1_CONSUMER_USAGE_HWCOMPOSER)
 		bind |= GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
 
 	return bind;
@@ -154,7 +148,7 @@ static struct gbm_bo *gbm_import(struct gbm_device *gbm,
 		buffer_handle_t _handle)
 {
 	struct gbm_bo *bo;
-	struct gralloc_handle_t *handle = gralloc_handle(_handle);
+	struct gralloc1_handle_t *handle = gralloc1_handle(_handle);
 	struct gbm_import_fd_data data;
 
 	int format = get_gbm_format(handle->format);
@@ -182,19 +176,13 @@ static struct gbm_bo *gbm_alloc(struct gbm_device *gbm,
 		buffer_handle_t _handle)
 {
 	struct gbm_bo *bo;
-	struct gralloc_handle_t *handle = gralloc_handle(_handle);
+	struct gralloc1_handle_t *handle = gralloc1_handle(_handle);
 	int format = get_gbm_format(handle->format);
-	int usage = get_pipe_bind(handle->usage);
+	int gbm_usage = get_pipe_bind(handle->usage);
 	int width, height;
 
 	width = handle->width;
 	height = handle->height;
-	if (usage & GBM_BO_USE_CURSOR) {
-		if (handle->width < 64)
-			width = 64;
-		if (handle->height < 64)
-			height = 64;
-	}
 
 	/*
 	 * For YV12, we request GR88, so halve the width since we're getting
@@ -205,12 +193,12 @@ static struct gbm_bo *gbm_alloc(struct gbm_device *gbm,
 		height += handle->height / 2;
 	}
 
-	ALOGV("create BO, size=%dx%d, fmt=%d, usage=%x",
-	      handle->width, handle->height, handle->format, usage);
-	bo = gbm_bo_create(gbm, width, height, format, usage);
+	ALOGV("create BO, size=%dx%d, fmt=%d, gbm_usage=%x",
+	      handle->width, handle->height, handle->format, gbm_usage);
+	bo = gbm_bo_create(gbm, width, height, format, gbm_usage);
 	if (!bo) {
-		ALOGE("failed to create BO, size=%dx%d, fmt=%d, usage=%x",
-		      handle->width, handle->height, handle->format, usage);
+		ALOGE("failed to create BO, size=%dx%d, fmt=%d, gbm_usage=%x",
+		      handle->width, handle->height, handle->format, gbm_usage);
 		return NULL;
 	}
 
@@ -244,7 +232,7 @@ static int gbm_map(buffer_handle_t handle, int x, int y, int w, int h,
 {
 	int err = 0;
 	int flags = GBM_BO_TRANSFER_READ;
-	struct gralloc_gbm_handle_t *gbm_handle = gralloc_handle(handle);
+	struct gralloc_gbm_handle_t *gbm_handle = gralloc1_handle(handle);
 	struct gbm_bo *bo = gralloc_gbm_bo_from_handle(handle);
 	struct bo_data_t *bo_data = gbm_bo_data(bo);
 	uint32_t stride;
@@ -346,12 +334,12 @@ int gralloc_gbm_handle_unregister(buffer_handle_t handle)
  * Create a bo.
  */
 buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
-		int width, int height, int format, int usage, int *stride)
+		int width, int height, int format, uint64_t usage, int *stride)
 {
 	struct gbm_bo *bo;
 	native_handle_t *handle;
 
-	handle = gralloc_handle_create(width, height, format, usage);
+	handle = gralloc1_handle_create(width, height, format, usage);
 	if (!handle)
 		return NULL;
 
@@ -364,7 +352,7 @@ buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
 	gbm_bo_handle_map.emplace(handle, bo);
 
 	/* in pixels */
-	*stride = gralloc_handle(handle)->stride / gralloc_gbm_get_bpp(format);
+	*stride = gralloc1_handle(handle)->stride / gralloc_gbm_get_bpp(format);
 
 	return handle;
 }
@@ -373,23 +361,23 @@ buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
  * Lock a bo.  XXX thread-safety?
  */
 int gralloc_gbm_bo_lock(buffer_handle_t handle,
-		int usage, int x, int y, int w, int h,
+		uint64_t usage, int x, int y, int w, int h,
 		void **addr)
 {
-	struct gralloc_handle_t *gbm_handle = gralloc_handle(handle);
+	struct gralloc1_handle_t *gbm_handle = gralloc1_handle(handle);
 	struct gbm_bo *bo = gralloc_gbm_bo_from_handle(handle);
 	struct bo_data_t *bo_data;
 
 	if (!bo)
 		return -EINVAL;
 
-	if ((gbm_handle->usage & usage) != (uint32_t)usage) {
+	if ((gbm_handle->usage & usage) != usage) {
 		/* make FB special for testing software renderer with */
 
-		if (!(gbm_handle->usage & GRALLOC_USAGE_SW_READ_OFTEN) &&
-				!(gbm_handle->usage & GRALLOC_USAGE_HW_FB) &&
-				!(gbm_handle->usage & GRALLOC_USAGE_HW_TEXTURE)) {
-			ALOGE("bo.usage:x%X/usage:x%X is not GRALLOC_USAGE_HW_FB or GRALLOC_USAGE_HW_TEXTURE",
+		if (!(gbm_handle->usage & GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN) &&
+				!(gbm_handle->usage & GRALLOC1_CONSUMER_USAGE_CLIENT_TARGET) &&
+				!(gbm_handle->usage & GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE)) {
+			ALOGE("bo.usage:x%lx/usage:x%lx is not GRALLOC1_CONSUMER_USAGE_CLIENT_TARGET or GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE",
 				gbm_handle->usage, usage);
 			return -EINVAL;
 		}
@@ -401,7 +389,7 @@ int gralloc_gbm_bo_lock(buffer_handle_t handle,
 		gbm_bo_set_user_data(bo, bo_data, gralloc_gbm_destroy_user_data);
 	}
 
-	ALOGV("lock bo %p, cnt=%d, usage=%x", bo, bo_data->lock_count, usage);
+	ALOGV("lock bo %p, cnt=%d, usage=%lx", bo, bo_data->lock_count, usage);
 
 	/* allow multiple locks with compatible usages */
 	if (bo_data->lock_count && (bo_data->locked_for & usage) != usage)
@@ -418,10 +406,11 @@ int gralloc_gbm_bo_lock(buffer_handle_t handle,
 		h = gbm_handle->height;
 	}
 
-	if (usage & (GRALLOC_USAGE_SW_WRITE_MASK |
-		     GRALLOC_USAGE_SW_READ_MASK)) {
+	if (usage & (GRALLOC1_PRODUCER_USAGE_CPU_WRITE | GRALLOC1_PRODUCER_USAGE_CPU_WRITE_OFTEN |
+		     GRALLOC1_CONSUMER_USAGE_CPU_READ | GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN)) {
 		/* the driver is supposed to wait for the bo */
-		int write = !!(usage & GRALLOC_USAGE_SW_WRITE_MASK);
+	  int write = !!(usage & (GRALLOC1_PRODUCER_USAGE_CPU_WRITE |
+				  GRALLOC1_PRODUCER_USAGE_CPU_WRITE_OFTEN));
 		int err = gbm_map(handle, x, y, w, h, write, addr);
 		if (err)
 			return err;
@@ -449,7 +438,8 @@ int gralloc_gbm_bo_unlock(buffer_handle_t handle)
 	bo_data = gbm_bo_data(bo);
 
 	int mapped = bo_data->locked_for &
-		(GRALLOC_USAGE_SW_WRITE_MASK | GRALLOC_USAGE_SW_READ_MASK);
+	      (GRALLOC1_PRODUCER_USAGE_CPU_WRITE | GRALLOC1_PRODUCER_USAGE_CPU_WRITE_OFTEN |
+	       GRALLOC1_CONSUMER_USAGE_CPU_READ | GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN);
 
 	if (!bo_data->lock_count)
 		return 0;
@@ -467,15 +457,15 @@ int gralloc_gbm_bo_unlock(buffer_handle_t handle)
 #define GRALLOC_ALIGN(value, base) (((value) + ((base)-1)) & ~((base)-1))
 
 int gralloc_gbm_bo_lock_ycbcr(buffer_handle_t handle,
-		int usage, int x, int y, int w, int h,
+		uint64_t usage, int x, int y, int w, int h,
 		struct android_ycbcr *ycbcr)
 {
-	struct gralloc_handle_t *hnd = gralloc_handle(handle);
+	struct gralloc1_handle_t *hnd = gralloc1_handle(handle);
 	int ystride, cstride;
 	void *addr = 0;
 	int err;
 
-	ALOGV("handle %p, hnd %p, usage 0x%x", handle, hnd, usage);
+	ALOGV("handle %p, hnd %p, usage 0x%lx", handle, hnd, usage);
 
 	err = gralloc_gbm_bo_lock(handle, usage, x, y, w, h, &addr);
 	if (err)

@@ -22,6 +22,9 @@ cc_binary {
         "libsync",
         "libdrm",
     ],
+    static_libs: [
+        "libgbm_gralloc",
+    ],
     header_libs: [
         "android.hardware.graphics.mapper@2.0-passthrough_headers",
         "android.hardware.graphics.composer@2.1-command-buffer",
