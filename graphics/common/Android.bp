@@ -1,8 +1,7 @@
 cc_library_static {
     name: "libgbm_gralloc",
     srcs: [
-        "gralloc_gbm.cpp",
-        "gbm_module.cpp",
+        "gbm_gralloc.cpp",
     ],
     export_include_dirs: ["."],
     shared_libs: [

@@ -46,7 +46,7 @@ class Allocator : public IAllocator {
                 buffer_handle_t* outBufferHandle, uint32_t *outStride);
     void freeBuffers(const std::vector<const native_handle_t*>& buffers);
 
-    struct gbm_module_t* mModule;
+    struct gbm_device *gbmDevice;
 };
 
 }  // namespace implementation

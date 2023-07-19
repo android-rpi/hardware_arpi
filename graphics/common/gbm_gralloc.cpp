@@ -2,7 +2,7 @@
  * Copyright (C) 2010-2011 Chia-I Wu <olvaffe@gmail.com>
  * Copyright (C) 2010-2011 LunarG Inc.
  * Copyright (C) 2016 Linaro, Ltd., Rob Herring <robh@kernel.org>
- * Copyright (C) 2022 Android-RPi Project
+ * Copyright (C) 2022-2023 Android-RPi Project
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -33,8 +33,8 @@
 
 #include <gbm.h>
 
-#include "gralloc_gbm_priv.h"
-#include "gralloc1_handle.h"
+#include "gbm_gralloc.h"
+#include "drm_handle.h"
 
 #include <unordered_map>
 
@@ -148,7 +148,7 @@ static struct gbm_bo *gbm_import(struct gbm_device *gbm,
 		buffer_handle_t _handle)
 {
 	struct gbm_bo *bo;
-	struct gralloc1_handle_t *handle = gralloc1_handle(_handle);
+	struct private_handle_t *handle = private_handle(_handle);
 	struct gbm_import_fd_data data;
 
 	int format = get_gbm_format(handle->format);
@@ -176,7 +176,7 @@ static struct gbm_bo *gbm_alloc(struct gbm_device *gbm,
 		buffer_handle_t _handle)
 {
 	struct gbm_bo *bo;
-	struct gralloc1_handle_t *handle = gralloc1_handle(_handle);
+	struct private_handle_t *handle = private_handle(_handle);
 	int format = get_gbm_format(handle->format);
 	int gbm_usage = get_pipe_bind(handle->usage);
 	int width, height;
@@ -232,7 +232,7 @@ static int gbm_map(buffer_handle_t handle, int x, int y, int w, int h,
 {
 	int err = 0;
 	int flags = GBM_BO_TRANSFER_READ;
-	struct gralloc_gbm_handle_t *gbm_handle = gralloc1_handle(handle);
+	struct private_handle_t *gbm_handle = private_handle(handle);
 	struct gbm_bo *bo = gralloc_gbm_bo_from_handle(handle);
 	struct bo_data_t *bo_data = gbm_bo_data(bo);
 	uint32_t stride;
@@ -268,40 +268,10 @@ static void gbm_unmap(struct gbm_bo *bo)
 	bo_data->map_data = NULL;
 }
 
-void gbm_dev_destroy(struct gbm_device *gbm)
-{
-	int fd = gbm_device_get_fd(gbm);
-
-	gbm_device_destroy(gbm);
-	close(fd);
-}
-
-struct gbm_device *gbm_dev_create(void)
-{
-	struct gbm_device *gbm;
-	char path[PROPERTY_VALUE_MAX];
-	int fd;
-
-	property_get("gralloc.drm.kms", path, "/dev/dri/card0");
-	fd = open(path, O_RDWR | O_CLOEXEC);
-	if (fd < 0) {
-		ALOGE("failed to open %s", path);
-		return NULL;
-	}
-
-	gbm = gbm_create_device(fd);
-	if (!gbm) {
-		ALOGE("failed to create gbm device");
-		close(fd);
-	}
-
-	return gbm;
-}
-
 /*
  * Register a buffer handle.
  */
-int gralloc_gbm_handle_register(buffer_handle_t _handle, struct gbm_device *gbm)
+int gbm_register(struct gbm_device *gbm, buffer_handle_t _handle)
 {
 	struct gbm_bo *bo;
 
@@ -323,10 +293,9 @@ int gralloc_gbm_handle_register(buffer_handle_t _handle, struct gbm_device *gbm)
 /*
  * Unregister a buffer handle.  It is no-op for handles created locally.
  */
-int gralloc_gbm_handle_unregister(buffer_handle_t handle)
+int gbm_unregister(buffer_handle_t handle)
 {
 	gbm_free(handle);
-
 	return 0;
 }
 
@@ -339,7 +308,7 @@ buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
 	struct gbm_bo *bo;
 	native_handle_t *handle;
 
-	handle = gralloc1_handle_create(width, height, format, usage);
+	handle = new private_handle_t(width, height, format, usage);
 	if (!handle)
 		return NULL;
 
@@ -352,7 +321,7 @@ buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
 	gbm_bo_handle_map.emplace(handle, bo);
 
 	/* in pixels */
-	*stride = gralloc1_handle(handle)->stride / gralloc_gbm_get_bpp(format);
+	*stride = private_handle(handle)->stride / gralloc_gbm_get_bpp(format);
 
 	return handle;
 }
@@ -360,11 +329,11 @@ buffer_handle_t gralloc_gbm_bo_create(struct gbm_device *gbm,
 /*
  * Lock a bo.  XXX thread-safety?
  */
-int gralloc_gbm_bo_lock(buffer_handle_t handle,
+int gbm_lock(buffer_handle_t handle,
 		uint64_t usage, int x, int y, int w, int h,
 		void **addr)
 {
-	struct gralloc1_handle_t *gbm_handle = gralloc1_handle(handle);
+	struct private_handle_t *gbm_handle = private_handle(handle);
 	struct gbm_bo *bo = gralloc_gbm_bo_from_handle(handle);
 	struct bo_data_t *bo_data;
 
@@ -428,7 +397,7 @@ int gralloc_gbm_bo_lock(buffer_handle_t handle,
 /*
  * Unlock a bo.
  */
-int gralloc_gbm_bo_unlock(buffer_handle_t handle)
+int gbm_unlock(buffer_handle_t handle)
 {
 	struct gbm_bo *bo = gralloc_gbm_bo_from_handle(handle);
 	struct bo_data_t *bo_data;
@@ -456,18 +425,18 @@ int gralloc_gbm_bo_unlock(buffer_handle_t handle)
 
 #define GRALLOC_ALIGN(value, base) (((value) + ((base)-1)) & ~((base)-1))
 
-int gralloc_gbm_bo_lock_ycbcr(buffer_handle_t handle,
+int gbm_lock_ycbcr(buffer_handle_t handle,
 		uint64_t usage, int x, int y, int w, int h,
 		struct android_ycbcr *ycbcr)
 {
-	struct gralloc1_handle_t *hnd = gralloc1_handle(handle);
+	struct private_handle_t *hnd = private_handle(handle);
 	int ystride, cstride;
 	void *addr = 0;
 	int err;
 
 	ALOGV("handle %p, hnd %p, usage 0x%lx", handle, hnd, usage);
 
-	err = gralloc_gbm_bo_lock(handle, usage, x, y, w, h, &addr);
+	err = gbm_lock(handle, usage, x, y, w, h, &addr);
 	if (err)
 		return err;
 
@@ -510,3 +479,51 @@ int gralloc_gbm_bo_lock_ycbcr(buffer_handle_t handle,
 
 	return 0;
 }
+
+
+
+struct gbm_device *gbm_init(void)
+{
+	struct gbm_device *gbm;
+	char path[PROPERTY_VALUE_MAX];
+	int fd;
+
+	property_get("gralloc.drm.kms", path, "/dev/dri/card0");
+	fd = open(path, O_RDWR | O_CLOEXEC);
+	if (fd < 0) {
+		ALOGE("failed to open %s", path);
+		return nullptr;
+	}
+
+	gbm = gbm_create_device(fd);
+	if (!gbm) {
+		ALOGE("failed to create gbm device");
+		close(fd);
+		return nullptr;
+	}
+
+	return gbm;
+}
+
+void gbm_destroy(struct gbm_device *gbm)
+{
+	int fd = gbm_device_get_fd(gbm);
+
+	gbm_device_destroy(gbm);
+	close(fd);
+}
+
+int gbm_alloc(struct gbm_device *gbm, int w, int h, int format, uint64_t usage,
+		buffer_handle_t *handle, int *stride) {
+    int err = 0;
+    int bpp = gralloc_gbm_get_bpp(format);
+    if (!bpp) return -EINVAL;
+
+    *handle = gralloc_gbm_bo_create(gbm, w, h, format, usage, stride);
+    if (!*handle)
+        err = -errno;
+
+    ALOGV("buffer %p usage = %016lx", *handle, usage);
+    return err;
+}
+

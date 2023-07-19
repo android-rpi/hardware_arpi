@@ -19,6 +19,7 @@ cc_library_shared {
     ],
     srcs: [
         "gralloc_rpi.cpp",
+        "gbm_module.cpp",
     ],
     cflags: [
         "-Wall",

@@ -19,10 +19,11 @@
 #include <utils/Log.h>
 #include <sys/errno.h>
 #include <pthread.h>
-#include <gbm_module.h>
 
 #include <hardware/gralloc.h>
 #include <hardware/gralloc1.h>
+
+#include "gbm_module.h"
 
 static void android_convertGralloc0To1Usage(int32_t usage, uint64_t* producerUsage,
                                      uint64_t* consumerUsage) {

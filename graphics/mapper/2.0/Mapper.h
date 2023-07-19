@@ -52,7 +52,7 @@ class Mapper : public IMapper {
     Return<void> unlock(void* buffer, IMapper::unlock_cb hidl_cb) override;
 
   private:
-    struct gbm_module_t* mModule;
+    struct gbm_device *gbmDevice;
 };
 
 extern "C" IMapper* HIDL_FETCH_IMapper(const char* name);

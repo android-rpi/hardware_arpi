@@ -46,7 +46,7 @@ namespace android {
 /*
  * Add a fb object for a bo.
  */
-int hwc_context::bo_add_fb(struct gralloc1_handle_t *bo)
+int hwc_context::bo_add_fb(const private_handle_t *bo)
 {
 	if (bo->fb_id)
 		return 0;
@@ -67,7 +67,7 @@ int hwc_context::bo_add_fb(struct gralloc1_handle_t *bo)
 		return ret;
 	}
 
-	pitches[0] = bo->stride;
+	pitches[0] = width * 4;
 	handles[0] = handle;
 	modifiers[0] = DRM_FORMAT_MOD_LINEAR;
 
@@ -77,7 +77,7 @@ int hwc_context::bo_add_fb(struct gralloc1_handle_t *bo)
 	return drmModeAddFB2WithModifiers(kms_fd,
 		width, height,
 		drm_format, handles, pitches, offsets, modifiers,
-                &bo->fb_id, DRM_MODE_FB_MODIFIERS);
+                (uint32_t *)&bo->fb_id, DRM_MODE_FB_MODIFIERS);
 }
 
 /*
@@ -127,7 +127,7 @@ static void page_flip_handler2(int /*fd*/, unsigned int /*sequence*/,
 /*
  * Schedule a page flip.
  */
-int hwc_context::page_flip(struct gralloc1_handle_t *bo)
+int hwc_context::page_flip(const private_handle_t *bo)
 {
 	int ret;
 
@@ -162,7 +162,7 @@ int hwc_context::page_flip(struct gralloc1_handle_t *bo)
 	return ret;
 }
 
-int hwc_context::page_flip2(struct gralloc1_handle_t *bo)
+int hwc_context::page_flip2(const private_handle_t *bo)
 {
 	int ret;
 
@@ -299,7 +299,7 @@ void hwc_context::wait_for_post2(int flip)
 /*
  * Post a bo.  This is not thread-safe.
  */
-int hwc_context::bo_post(struct gralloc1_handle_t *bo)
+int hwc_context::bo_post(const private_handle_t *bo)
 {
 	int ret;
 
@@ -340,7 +340,7 @@ int hwc_context::bo_post(struct gralloc1_handle_t *bo)
 	return ret;
 }
 
-int hwc_context::bo_post2(struct gralloc1_handle_t *bo)
+int hwc_context::bo_post2(const private_handle_t *bo)
 {
 	int ret;
 
@@ -826,20 +826,20 @@ hwc_context::hwc_context() {
     }
 }
 
-int hwc_context::hwc_post(hwc2_display_t display_id, buffer_handle_t handle)
+int hwc_context::hwc_post(hwc2_display_t display_id, buffer_handle_t buffer)
 {
-	struct gralloc1_handle_t *bo = (struct gralloc1_handle_t *)gralloc_check_handle(handle);
+    if (private_handle_t::validate(buffer) < 0)
+       return -EINVAL;
 
-	if (!bo)
-		return -EINVAL;
+    private_handle_t const* handle = reinterpret_cast<private_handle_t const*>(buffer);
 
-	ALOGV("hwc_post() prime_fd %d, fb_id %d",
-			bo->prime_fd, bo->fb_id);
+	ALOGV("hwc_post() fd %d, fb_id %d",
+		handle->prime_fd, handle->fb_id);
 
     if (display_id == 0) {
-        return bo_post(bo);
+        return bo_post(handle);
     } else if (display_id == 1) {
-        return bo_post2(bo);
+      return bo_post2(handle);
     } else
     return -EINVAL;
 }
