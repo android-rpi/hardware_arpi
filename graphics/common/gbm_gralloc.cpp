@@ -152,7 +152,7 @@ static struct gbm_bo *gbm_import(struct gbm_device *gbm,
 	struct gbm_import_fd_data data;
 
 	int format = get_gbm_format(handle->format);
-	if (handle->prime_fd < 0)
+	if (handle->fd < 0)
 		return NULL;
 
 	memset(&data, 0, sizeof(data));
@@ -165,7 +165,7 @@ static struct gbm_bo *gbm_import(struct gbm_device *gbm,
 		data.height += handle->height / 2;
 	}
 
-	data.fd = handle->prime_fd;
+	data.fd = handle->fd;
 	data.stride = handle->stride;
 	bo = gbm_bo_import(gbm, GBM_BO_IMPORT_FD, &data, 0);
 
@@ -202,7 +202,7 @@ static struct gbm_bo *gbm_alloc(struct gbm_device *gbm,
 		return NULL;
 	}
 
-	handle->prime_fd = gbm_bo_get_fd(bo);
+	handle->fd = gbm_bo_get_fd(bo);
 	handle->stride = gbm_bo_get_stride(bo);
 
 	return bo;

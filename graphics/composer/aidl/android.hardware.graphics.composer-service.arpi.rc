@@ -1,0 +1,7 @@
+service vendor.hwcomposer-arpi /vendor/bin/hw/android.hardware.graphics.composer-service.arpi
+    class hal animation
+    user system
+    group graphics drmrpc
+    capabilities SYS_NICE
+    onrestart restart surfaceflinger
+    task_profiles ServiceCapacityLow

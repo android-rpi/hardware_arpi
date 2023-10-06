@@ -28,7 +28,7 @@
 struct private_handle_t : public native_handle {
 
     // file-descriptors
-    int     prime_fd;
+    int     fd;
 
     uint32_t magic; /* differentiate between allocator impls */
 
@@ -47,7 +47,7 @@ struct private_handle_t : public native_handle {
     static const int sMagic = 0x3141592;
 
     private_handle_t(int fd) :
-        prime_fd(fd), magic(sMagic),
+        fd(fd), magic(sMagic),
         fb_id(0)
     {
         version = sizeof(native_handle);
@@ -58,7 +58,7 @@ struct private_handle_t : public native_handle {
 
     private_handle_t(int32_t width, int32_t height, int32_t hal_format,
 		     int64_t usage) :
-  	prime_fd(-1), magic(sMagic), width(width), height(height), format(hal_format),
+  	fd(-1), magic(sMagic), width(width), height(height), format(hal_format),
         fb_id(0), usage(usage)
     {
         version = sizeof(native_handle);

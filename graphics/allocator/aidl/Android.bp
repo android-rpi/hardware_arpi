@@ -1,0 +1,38 @@
+cc_binary {
+    name: "android.hardware.graphics.allocator-service.arpi",
+    vendor: true,
+    proprietary: true,
+    relative_install_path: "hw",
+    init_rc: [
+        "android.hardware.graphics.allocator-service.arpi.rc",
+    ],
+    vintf_fragments: [
+        "manifest_allocator_arpi.xml"
+    ],
+    shared_libs: [
+        "android.hardware.graphics.allocator-V1-ndk",
+        "android.hardware.graphics.common@1.0",
+        "android.hardware.graphics.mapper@4.0",
+        "libbinder_ndk",
+        "libgralloctypes",
+        "libhidlbase",
+        "libhardware",
+        "liblog",
+        "libutils",
+        "libcutils",
+        "libdrm",
+    ],
+    static_libs: [
+        "libaidlcommonsupport",
+        "libgbm_gralloc",
+        "libgbm_mesa",
+    ],
+    srcs: [
+        "Allocator.cpp",
+        "service.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}

@@ -1,0 +1,37 @@
+cc_library_shared {
+    name: "android.hardware.graphics.mapper@4.0-impl.arpi",
+    vendor: true,
+    proprietary: true,
+    relative_install_path: "hw",
+    shared_libs: [
+        "android.hardware.graphics.mapper@4.0",
+        "android.hardware.graphics.common@1.0",
+        "libgralloctypes",
+        "libhidlbase",
+        "libhardware",
+        "libbase",
+        "libutils",
+        "libcutils",
+        "liblog",
+        "libsync",
+        "libdrm",
+    ],
+    static_libs: [
+        "libgbm_gralloc",
+        "libgbm_mesa",
+    ],
+    header_libs: [
+        "libdrm_headers",
+    ],
+    include_dirs: [
+        "system/core/libsync/include",
+    ],
+    srcs: [
+        "Mapper.cpp",
+        "Fence.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}
