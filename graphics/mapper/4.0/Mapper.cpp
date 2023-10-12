@@ -33,6 +33,9 @@ namespace mapper {
 namespace V4_0 {
 namespace implementation {
 
+using aidl::android::hardware::graphics::common::Dataspace;
+using aidl::android::hardware::graphics::common::StandardMetadataType;
+
 Mapper::Mapper() {
     ALOGV("Mapper()");
     gbmDevice = gbm_init();
@@ -276,7 +279,7 @@ Return<void> Mapper::isSupported(const BufferDescriptorInfo& /*descriptor*/,
     return Void();
 }
 
-Return<void> Mapper::get(void* buffer, const MetadataType& /*metadataType*/, get_cb hidl_cb) {
+Return<void> Mapper::get(void* buffer, const MetadataType& metadataType, get_cb hidl_cb) {
     ALOGV("get()");
     hidl_vec<uint8_t> encodedMetadata;
     buffer_handle_t bufferHandle = reinterpret_cast<buffer_handle_t>(buffer);
@@ -284,7 +287,14 @@ Return<void> Mapper::get(void* buffer, const MetadataType& /*metadataType*/, get
         hidl_cb(Error::BAD_BUFFER, encodedMetadata);
         return Void();
     }
-    hidl_cb(Error::UNSUPPORTED, encodedMetadata);
+    if (android::gralloc4::isStandardMetadataType(metadataType) &&
+	android::gralloc4::getStandardMetadataTypeValue(metadataType)
+	    == StandardMetadataType::DATASPACE) {
+	    android::gralloc4::encodeDataspace(Dataspace::UNKNOWN, &encodedMetadata);
+      hidl_cb(Error::NONE, encodedMetadata);
+    } else {
+      hidl_cb(Error::UNSUPPORTED, encodedMetadata);
+    }
     return Void();
 }
 
