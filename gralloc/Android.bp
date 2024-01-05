@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "gralloc.rpi4",
+    name: "gralloc.rpi5",
     vendor: true,
     proprietary: true,
     relative_install_path: "hw",
