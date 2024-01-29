@@ -23,6 +23,7 @@
 #include <gralloctypes/Gralloc4.h>
 #include <hardware/gralloc1.h>
 
+#include <drm_handle.h>
 #include <gbm_gralloc.h>
 #include "Mapper.h"
 
@@ -34,6 +35,7 @@ namespace V4_0 {
 namespace implementation {
 
 using aidl::android::hardware::graphics::common::Dataspace;
+using aidl::android::hardware::graphics::common::PlaneLayout;
 using aidl::android::hardware::graphics::common::StandardMetadataType;
 
 Mapper::Mapper() {
@@ -279,22 +281,169 @@ Return<void> Mapper::isSupported(const BufferDescriptorInfo& /*descriptor*/,
     return Void();
 }
 
+#define GRALLOC_ALIGN(value, base) (((value) + ((base)-1)) & ~((base)-1))
+
+static android::status_t get_plane_layouts(buffer_handle_t handle,
+                                std::vector<PlaneLayout> *layouts) {
+    struct private_handle_t *hnd = (struct private_handle_t *)handle;
+    PlaneLayout layout;
+    /* Y */
+    switch (hnd->format) {
+    case HAL_PIXEL_FORMAT_YCbCr_420_888:
+    case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        layouts->reserve(3);
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_Y,
+ 	                     .offsetInBits = 0}},
+                .offsetInBytes = 0,
+                .sampleIncrementInBits = 8,
+		.strideInBytes = GRALLOC_ALIGN(hnd->width, 16),
+		.widthInSamples = hnd->width,
+		.heightInSamples = hnd->height,
+		.totalSizeInBytes = GRALLOC_ALIGN(hnd->width, 16) * hnd->height,
+                .horizontalSubsampling = 1,
+                .verticalSubsampling = 1};
+	break;
+    case HAL_PIXEL_FORMAT_YV12:
+        layouts->reserve(3);
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_Y,
+                             .offsetInBits = 0}},
+                .offsetInBytes = 0,
+                .sampleIncrementInBits = 8,
+		.strideInBytes = hnd->width,
+		.widthInSamples = hnd->width,
+		.heightInSamples = hnd->height,
+		.totalSizeInBytes = hnd->width * hnd->height,
+                .horizontalSubsampling = 1,
+                .verticalSubsampling = 1};
+	break;
+    default:
+        return android::BAD_VALUE;
+    }
+    layouts->push_back(layout);
+
+    /* CR */
+    switch (hnd->format) {
+    case HAL_PIXEL_FORMAT_YCbCr_420_888:
+    case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_CR,
+                             .offsetInBits = 0}},
+                .offsetInBytes = GRALLOC_ALIGN(hnd->width, 16) * hnd->height + 1,
+		.sampleIncrementInBits = 16,
+		.strideInBytes = GRALLOC_ALIGN(hnd->width, 16),
+		.widthInSamples = hnd->width / 2,
+		.heightInSamples = hnd->height / 2,
+		.totalSizeInBytes = GRALLOC_ALIGN(hnd->width / 2, 16) * hnd->height / 2,
+                .horizontalSubsampling = 2,
+                .verticalSubsampling = 2};
+	break;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_CR,
+                             .offsetInBits = 0}},
+                .offsetInBytes = GRALLOC_ALIGN(hnd->width, 16) * hnd->height,
+		.sampleIncrementInBits = 16,
+		.strideInBytes = GRALLOC_ALIGN(hnd->width, 16),
+		.widthInSamples = hnd->width / 2,
+		.heightInSamples = hnd->height / 2,
+		.totalSizeInBytes = GRALLOC_ALIGN(hnd->width / 2, 16) * hnd->height / 2,
+                .horizontalSubsampling = 2,
+                .verticalSubsampling = 2};
+	break;
+    case HAL_PIXEL_FORMAT_YV12:
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_CR,
+                             .offsetInBits = 0}},
+                .offsetInBytes = hnd->width * hnd->height,
+		.sampleIncrementInBits = 8,
+		.strideInBytes = GRALLOC_ALIGN(hnd->width / 2, 16),
+		.widthInSamples = hnd->width / 2,
+		.heightInSamples = hnd->height / 2,
+		.totalSizeInBytes = GRALLOC_ALIGN(hnd->width / 2, 16) * hnd->height / 2,
+                .horizontalSubsampling = 2,
+                .verticalSubsampling = 2};
+	break;
+    default:
+        return android::BAD_VALUE;
+    }
+    layouts->push_back(layout);
+
+    /* CB */
+    switch (hnd->format) {
+    case HAL_PIXEL_FORMAT_YCbCr_420_888:
+    case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+        ALOGV("get_plane_layouts() HAL_PIXEL_FORMAT_YCbCr_420_888");
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_CB,
+                             .offsetInBits = 0}},
+                .offsetInBytes = GRALLOC_ALIGN(hnd->width, 16) * hnd->height,
+		.sampleIncrementInBits = 16,
+		.strideInBytes = GRALLOC_ALIGN(hnd->width, 16),
+		.widthInSamples = hnd->width / 2,
+		.heightInSamples = hnd->height / 2,
+		.totalSizeInBytes = GRALLOC_ALIGN(hnd->width / 2, 16) * hnd->height / 2,
+                .horizontalSubsampling = 2,
+                .verticalSubsampling = 2};
+	break;
+    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        ALOGV("get_plane_layouts() HAL_PIXEL_FORMAT_YCrCb_420_SP");
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_CB,
+                             .offsetInBits = 0}},
+                .offsetInBytes = GRALLOC_ALIGN(hnd->width, 16) * hnd->height + 1,
+		.sampleIncrementInBits = 16,
+		.strideInBytes = GRALLOC_ALIGN(hnd->width, 16),
+		.widthInSamples = hnd->width / 2,
+		.heightInSamples = hnd->height / 2,
+		.totalSizeInBytes = GRALLOC_ALIGN(hnd->width / 2, 16) * hnd->height / 2,
+                .horizontalSubsampling = 2,
+                .verticalSubsampling = 2};
+	break;
+    case HAL_PIXEL_FORMAT_YV12:
+        ALOGV("get_plane_layouts() HAL_PIXEL_FORMAT_YV12");
+        layout = {.components = {{.type = android::gralloc4::PlaneLayoutComponentType_CB,
+                             .offsetInBits = 0}},
+                .offsetInBytes = hnd->width * hnd->height
+		                + GRALLOC_ALIGN(hnd->width / 2, 16) * hnd->height / 2,
+		.sampleIncrementInBits = 8,
+		.strideInBytes = GRALLOC_ALIGN(hnd->width / 2, 16),
+		.widthInSamples = hnd->width / 2,
+		.heightInSamples = hnd->height / 2,
+		.totalSizeInBytes = GRALLOC_ALIGN(hnd->width / 2, 16) * hnd->height / 2,
+                .horizontalSubsampling = 2,
+                .verticalSubsampling = 2};
+	break;
+    default:
+        return android::BAD_VALUE;
+    }
+    layouts->push_back(layout);
+
+    return android::OK;
+}
+
 Return<void> Mapper::get(void* buffer, const MetadataType& metadataType, get_cb hidl_cb) {
-    ALOGV("get()");
+    android::status_t err = android::OK;
     hidl_vec<uint8_t> encodedMetadata;
     buffer_handle_t bufferHandle = reinterpret_cast<buffer_handle_t>(buffer);
     if (!bufferHandle) {
         hidl_cb(Error::BAD_BUFFER, encodedMetadata);
         return Void();
     }
-    if (android::gralloc4::isStandardMetadataType(metadataType) &&
-	android::gralloc4::getStandardMetadataTypeValue(metadataType)
-	    == StandardMetadataType::DATASPACE) {
-	    android::gralloc4::encodeDataspace(Dataspace::UNKNOWN, &encodedMetadata);
-      hidl_cb(Error::NONE, encodedMetadata);
-    } else {
-      hidl_cb(Error::UNSUPPORTED, encodedMetadata);
+    if (android::gralloc4::isStandardMetadataType(metadataType)) {
+        switch (android::gralloc4::getStandardMetadataTypeValue(metadataType)) {
+        case StandardMetadataType::DATASPACE: {
+            err = android::gralloc4::encodeDataspace(Dataspace::UNKNOWN, &encodedMetadata);
+	    break;
+	}
+        case StandardMetadataType::PLANE_LAYOUTS: {
+            std::vector<PlaneLayout> layouts;
+            err = get_plane_layouts(bufferHandle, &layouts);
+            if (!err) {
+                err = android::gralloc4::encodePlaneLayouts(layouts, &encodedMetadata);
+            }
+	    break;
+        }
+	default:
+	    err = android::BAD_VALUE;
+	}
     }
+    hidl_cb((err) ? Error::UNSUPPORTED : Error::NONE, encodedMetadata);
     return Void();
 }
 
